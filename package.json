@@ -1,0 +1,72 @@
+{
+  "name": "iobroker.husq-automower",
+  "version": "0.0.2",
+  "description": "Control your Husquana Automower with connectmodul",
+  "keywords": [
+    "ioBroker",
+    "Husquana",
+    "Automower",
+    "Smart Home",
+    "home automation"
+  ],
+  "homepage": "https://github.com/truegreyhound/iobroker.husq-automower",
+  "bugs": {
+    "url": "https://github.com/truegreyhound/iobroker.husq-automower/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "truegreyhound",
+    "email": "truegreyhound@gmx.net"
+  },
+  "contributors": [
+    {
+      "name": "truegreyhound",
+      "email": "truegreyhound@gmx.net"
+    }
+  ],
+  "main": "main.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/truegreyhound/iobroker.husq-automower.git"
+  },
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha --exit"
+  },
+  "dependencies": {
+    "node-schedule": "^1.2.5",
+    "request": "^2.83.0"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "mocha": "^4.1.0",
+    "chai": "^4.1.2"
+  },
+  "gitHead": "6261c29f6be21a34f41fd22375bb8504362ded63",
+  "_id": "iobroker.husq-automower@2.1.1",
+  "_shasum": "2376373425e266d6b8327f4923e3d8276918557a",
+  "_from": "iobroker.husq-automower@latest",
+  "_npmVersion": "3.10.10",
+  "_nodeVersion": "6.11.4",
+  "_npmUser": {
+    "name": "truegreyhound",
+    "email": "truegreyhound@gmx.net"
+  },
+  "dist": {
+    "shasum": "2376373425e266d6b8327f4923e3d8276918557a",
+    "tarball": "https://registry.npmjs.org/iobroker.husq-automower/-/iobroker.husq-automower-1.0.0.tgz",
+    "fileCount": 27,
+    "unpackedSize": 175373
+  },
+  "maintainers": [
+    {
+      "email": "truegreyhound@gmx.net",
+      "name": "truegreyhound"
+    }
+  ],
+  "directories": {},
+  "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages",
+    "tmp": "tmp/iobroker.husq-automower_2.1.1_1523598295733_0.8275777524600805"
+  },
+  "_resolved": "https://registry.npmjs.org/iobroker.husq-automower/-/iobroker.husq-automower-1.0.0.tgz"
+}

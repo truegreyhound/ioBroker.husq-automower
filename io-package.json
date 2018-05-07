@@ -1,0 +1,62 @@
+{
+  "common": {
+    "name": "husq-automower",
+    "version": "0.0.2",
+    "news": {
+      "1.0.0": {
+        "en": "every comnfig parameter is configureable",
+        "de": "Initial"
+      }
+    },
+    "title": "Husqvarna Automower with Connectmodul",
+    "titleLang": {
+      "en": "Control your Husquana Automower over www",
+      "de": "Steuern Sie Ihren Husquana Automower über das Web"
+    },
+    "desc": {
+      "en": "Control your Husquana Automower",
+      "de": "Steuere deinen Husquana Automower"
+    },
+    "materialize": true,
+    "platform": "Javascript/Node.js",
+    "mode": "daemon",
+    "icon": "husq-automower.png",
+    "enabled": true,
+    "extIcon": "https://raw.githubusercontent.com/truegreyhound/iobroker.husq-automower/master/admin/husq-automower.png",
+    "keywords": [
+      "husqvarna",
+      "husq-automower",
+      "mower"
+    ],
+    "readme": "https://github.com/truegreyhound/iobroker.husq-automower/blob/master/README.md",
+    "loglevel": "info",
+    "type": "garden",
+    "restartAdapters": [
+      "vis"
+    ],
+    "authors": [
+      {
+        "name": "truegreyhound",
+        "email": "truegreyhound@gmx.net"
+      }
+    ]
+  },
+    "native": {
+        "email": "max.mustermann@gmx.de",
+        "pwd": "PASSWORT",
+        "dev_sel": 0,
+        "enableJson": false,
+        "houerKm": false
+    },
+    "objects": [],
+    "instanceObjects": [
+      {
+        "_id": "info",
+        "type": "channel",
+        "common": {
+          "name": "information"
+        },
+        "native": {}
+      }
+    ]
+}

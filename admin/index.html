@@ -1,0 +1,164 @@
+<html>
+
+<!-- these 4 files always have to be included -->
+<link rel="stylesheet" type="text/css" href="../../lib/css/themes/jquery-ui/redmond/jquery-ui.min.css" />
+<script type="text/javascript" src="../../lib/js/jquery-1.11.1.min.js"></script>
+<script type="text/javascript" src="../../socket.io/socket.io.js"></script>
+<script type="text/javascript" src="../../lib/js/jquery-ui-1.10.3.full.min.js"></script>
+
+
+<!-- optional: use jqGrid
+<link rel="stylesheet" type="text/css" href="../../lib/css/jqGrid/ui.jqgrid-4.5.4.css"/>
+<script type="text/javascript" src="../../lib/js/jqGrid/jquery.jqGrid-4.5.4.min.js"></script>
+<script type="text/javascript" src="../../lib/js/jqGrid/i18n/grid.locale-all.js"></script>
+-->
+
+<!-- optional: use multiselect
+<link rel="stylesheet" type="text/css" href="../../lib/css/jquery.multiselect-1.13.css"/>
+<script type="text/javascript" src="../../lib/js/jquery.multiselect-1.13.min.js"></script>
+-->
+
+<!-- these two file always have to be included -->
+<link rel="stylesheet" type="text/css" href="../../css/adapter.css" />
+<script type="text/javascript" src="../../js/translate.js"></script>
+<script type="text/javascript" src="../../js/adapter-settings.js"></script>
+<script type="text/javascript" src="words.js"></script>
+
+
+<!-- you have to define 2 functions in the global scope: -->
+<script type="text/javascript">
+  // the function loadSettings has to exist ...
+  function load(settings, onChange) {
+    // example: select elements with id=key and class=value and insert value
+    for (var key in settings) {
+      // example: select elements with id=key and class=value and insert value
+      var value = $('#' + key + '.value');
+      if (value.attr('type') === 'checkbox') {
+        value.prop('checked', settings[key]).change(function() {
+          onChange();
+        });
+      } else {
+        value.val(settings[key]).change(function() {
+          onChange();
+        }).keyup(function() {
+          $(this).trigger('change');
+        });
+      }
+    }
+    // Signal to admin, that no changes yet
+    onChange(false);
+  }
+  // ... and the function save has to exist.
+  // you have to make sure the callback is called with the settings object as first param!
+  function save(callback) {
+    // example: select elements with class=value and build settings object
+    var obj = {};
+    $('.value').each(function() {
+      var $this = $(this);
+      if ($this.attr('type') === 'checkbox') {
+        obj[$this.attr('id')] = $this.prop('checked');
+      } else {
+        obj[$this.attr('id')] = $this.val();
+      }
+    });
+    callback(obj);
+  }
+</script>
+
+<!-- you have to put your config page in a div with id adapter-container -->
+<div id="adapter-container">
+
+  <table>
+    <tr>
+      <td><img src="husq-automower.png" /></td>
+      <td>
+        <h3 class="translate">Automower</h3></td>
+    </tr>
+  </table>
+
+
+  <table style="width: calc(100% - 20px); padding: 5px;">
+    <tr>
+      <td colspan="4">
+      <h4 class="translate" style="width: 100%">settings</h4></td>
+    </tr>
+    <tr>
+      <td style="width: 300px"><label for="email" class="translate">e-mail</label></td>
+      <td><input class="value" id="email" type="text" size="15" style="width: 200px" /></td>
+    </tr>
+    <tr>
+      <td><label for="pwd" class="translate">password</label></td>
+      <td><input class="value" id="pwd" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+ <!--   <tr>
+      <td><label for="dev_sel" class="translate">mower select</label></td>
+      <td><input class="value" id="dev_sel" size="5" type="number" style="width: 100px" /></td>
+    </tr> -->
+    <tr>
+      <td><label for="dev_sel" class="translate">nickname</label></td>
+      <td><input class="value" id="nickname" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+<!--
+    <tr>
+      <td><label for="dev_sel" class="translate">homeLocation_latitude</label></td>
+      <td><input class="value" id="homeLocation_latitude" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+    <tr>
+      <td><label for="dev_sel" class="translate">homeLocation_longitude</label></td>
+      <td><input class="value" id="homeLocation_longitude" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+-->
+    <tr>
+      <td><label for="dev_sel" class="translate">homeLocation_maxDistance</label></td>
+      <td><input class="value" id="homeLocation_maxDistance" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+    <tr>
+      <td><label for="dev_sel" class="translate">homeLocation_name</label></td>
+      <td><input class="value" id="homeLocation_name" size="5" type="text" style="width: 100px" /></td>
+    </tr>
+
+    <tr>
+      <td><label class="translate" for="enableJson" >add raw data</label></td>
+      <td><input id="enableJson" class="value" type="checkbox"/></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="houerKm" >Distance and time in min and m</label></td>
+      <td><input id="houerKm" class="value" type="checkbox"/></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="pollActive" >query intervall mower active</label></td>
+      <td><input id="pollActive" class="value" type="text" size="6" maxlength="4"/></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="pollInactive" >query intervall mower inactive</label></td>
+      <td><input id="pollInactive" class="value" type="text" size="6" maxlength="4"/></td>
+    </tr>
+    <tr>
+      <td style="width: 300px"><label for="idTimeZoneOffset" class="translate">idTimeZoneOffset</label></td>
+      <td><input class="value" id="idTimeZoneOffset" type="text" size="15" style="width: 200px" /></td>
+    </tr>
+    <tr>
+      <td style="width: 300px"><label for="idRainSensor" class="translate">idRainSensor</label></td>
+      <td><input class="value" id="idRainSensor" type="text" size="15" style="width: 200px" /></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="rainValue" >[bool,true}</label></td>
+      <td><input id="rainValue" class="value" type="text" size="6" maxlength="4"/></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="stopOnRainEnabled" >stop mover on rain</label></td>
+      <td><input id="stopOnRainEnabled" class="value" type="checkbox"/></td>
+    </tr>
+    <tr>
+      <td style="width: 300px"><label for="idWeatherRainForecast" class="idWeatherRainForecast"> </label></td>
+      <td><input class="value" id="idWeatherRainForecast" type="text" size="15" style="width: 200px" /></td>
+    </tr>
+    <tr>
+      <td><label class="translate" for="stopOnRainPercent" >stop on rain %</label></td>
+      <td><input id="stopOnRainPercent" class="value" type="text" size="6" maxlength="4"/></td>
+    </tr>
+  </table>
+
+</div>
+
+</html>
