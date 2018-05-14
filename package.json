@@ -1,6 +1,6 @@
 {
   "name": "iobroker.husq-automower",
-  "version": "0.0.2",
+  "version": "0.3.2",
   "description": "Control your Husquana Automower with connectmodul",
   "keywords": [
     "ioBroker",
@@ -9,9 +9,9 @@
     "Smart Home",
     "home automation"
   ],
-  "homepage": "https://github.com/truegreyhound/iobroker.husq-automower",
+  "homepage": "https://github.com/truegreyhound/ioBroker.husq-automower",
   "bugs": {
-    "url": "https://github.com/truegreyhound/iobroker.husq-automower/issues"
+    "url": "https://github.com/truegreyhound/ioBroker.husq-automower/issues"
   },
   "license": "MIT",
   "author": {
