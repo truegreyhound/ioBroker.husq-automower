@@ -1,21 +1,21 @@
 {
   "common": {
     "name": "husq-automower",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "news": {
       "1.0.0": {
-        "en": "every comnfig parameter is configureable",
+        "en": "Initial",
         "de": "Initial"
       }
     },
     "title": "Husqvarna Automower with Connectmodul",
     "titleLang": {
-      "en": "Control your Husquana Automower over www",
-      "de": "Steuern Sie Ihren Husquana Automower über das Web"
+      "en": "Control your Husqvarna Automower over www",
+      "de": "Steuern Sie Ihren Husqvarna Automower über das Web"
     },
     "desc": {
-      "en": "Control your Husquana Automower",
-      "de": "Steuere deinen Husquana Automower"
+      "en": "Control your Husqvarna Automower",
+      "de": "Steuere deinen Husqvarna Automower"
     },
     "materialize": true,
     "platform": "Javascript/Node.js",

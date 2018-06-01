@@ -11,14 +11,31 @@ Tested with 450X and 315X.
 
 For communication with Husqvarna web server, the adapter use scripts from [rannmann] (https://github.com/rannmann/node-husqvarna-automower).
 
+Over the action state "husq-automower.x.mower.action" you can do following actions:
+=  1 - start mower
+=  2 - stop mower
+=  3 - park mower
+=  9 - query Status (if schdeuler stopped, mower.scheduleTime == 0)
+= 77 - Rainbutton, toggle mower.stoppedDueRain: true - park mower it's raining, false - after configered standby time, the mower automatic start
+       button work parallel with optional sensor for rain detection
+= 91 - stop status scheduler (mower.scheduleTime == 0)
+= 92 - start status scheduler
+
+
 ## installation
 At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
 
 ## settings
-- to connect to the mower, type in email and password from your Husqvarna account in the Config.
+- to connect to the mower, type in email and password from your Husqvarna account in the config.
+- max. distance from base, if exceeded (value > 0), adapter write message to mover.sendMessage
 
 ## Changelog
 
+#### 0.3.4
+* (Greyhound) new configuration site
+* (Greyhound) correction in accumulate statistic values
+* (Greyhound) additional statistic values
+* (Greyhound) bugfixes in rain handler
 #### 0.3.3
 * (Greyhound) correct automower datetime with timezone offset
 * (Greyhound) other small corrections
@@ -34,7 +51,7 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 ## License
 The MIT License (MIT)
 
-Copyright (c) 2017 MeisterTR <meistertr.smarthome@gmail.com>
+Copyright (c) 2018 truegreyhound <truegreyhound@gmx.net>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

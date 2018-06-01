@@ -21,172 +21,353 @@
             font-size: 0.9em;
         }
     </style>
-    <!-- you have to define 2 functions in the global scope: -->
+
     <script type="text/javascript">
-        // the function loadSettings has to exist ...
-        function load(settings, onChange) {
+        var onChange = null;
+        var isAlive = false;
+
+        function encrypt(key, value) {
+            var result = '';
+            for (var i = 0; i < value.length; i++) {
+                result += String.fromCharCode(key[i % key.length].charCodeAt(0) ^ value.charCodeAt(i));
+            }
+            return result;
+        }
+
+        function decrypt(key, value) {
+            var result = '';
+            for (var i = 0; i < value.length; i++) {
+                result += String.fromCharCode(key[i % key.length].charCodeAt(0) ^ value.charCodeAt(i));
+            }
+            return result;
+        }
+
+        function init() {
+            $('#test').button().click(test);
+        }
+
+        function setValue(id, value) {
             // example: select elements with id=key and class=value and insert value
+            var $value = $('#' + id + '.value');
+            if ($value.attr('type') === 'checkbox') {
+                $value.prop('checked', value).change(function () {
+                    onChange();
+                });
+            } else {
+                $value.val(value).change(function () {
+                    onChange();
+                }).keyup(function () {
+                    onChange();
+                });
+            }
+        }
+
+        function loadHelper(settings, param, subparam) {
             if (!settings) return;
-            $('.value').each(function () {
-                var $key = $(this);
-                var id = $key.attr('id');
-                if ($key.attr('type') === 'checkbox') {
-                    // do not call onChange direct, because onChange could expect some arguments
-                    $key.prop('checked', settings[id]).change(function () {
-                        onChange();
-                    });
+
+            if (subparam && param) {
+                for (var key in settings[param][subparam]) {
+                    if (!settings[param][subparam].hasOwnProperty(key)) continue;
+                    if (typeof settings[param][subparam][key] !== 'object') {
+                        if (key === 'pass') {
+                            settings[param][subparam][key] = decrypt('Zgfr56gFe87jJOM', settings[param][subparam][key]);
+                        }
+                        setValue(param + '_' + subparam + '_' + key, settings[param][subparam][key]);
+                    } else {
+                        alert('4th level is not supported');
+                    }
+                }
+            } else if (param) {
+                for (var key in settings[param]) {
+                    if (!settings[param].hasOwnProperty(key)) continue;
+                    if (typeof settings[param][key] !== 'object') {
+                        setValue(param + '_' + key, settings[param][key]);
+                    } else {
+                        loadHelper(settings, param, key);
+                    }
+                }
+            } else {
+                for (var key in settings) {
+                    if (!settings.hasOwnProperty(key)) continue;
+                    if (typeof settings[key] !== 'object') {
+                        setValue(key, settings[key]);
+                    } else {
+                        loadHelper(settings, key);
+                    }
+                }
+            }
+        }
+
+        // the function loadSettings has to exist ...
+        function load(settings, _onChange) {
+            loadHelper(settings);
+            onChange = _onChange;
+            init();
+            onChange(false);
+            getIsAdapterAlive(function (_isAlive) {
+                isAlive = (_isAlive || common.enabled);
+            });
+        }
+
+        function test() {
+            if (!isAlive) {
+                showMessage(_('Enable first the adapter to test email.'));
+                return;
+            }
+            var transportOptionsService = $('#transportOptions_service').val();
+
+            sendTo('email.' + instance, 'send', {
+                subject: $('#defaults_subject').val(),
+                to: $('#defaults_to').val(),
+                from: $('#defaults_from').val(),
+                text: _('This is test email!'),
+                options: {
+                    host: transportOptionsService ? undefined : $('#transportOptions_host').val(),
+                    port: transportOptionsService ? undefined : $('#transportOptions_port').val(),
+                    secure: transportOptionsService ? undefined : $('#transportOptions_secure').prop('checked'),
+                    auth: {
+                        user: $('#transportOptions_auth_user').val(),
+                        pass: $('#transportOptions_auth_pass').val()
+                    },
+                    service: transportOptionsService
+                }
+            }, function (result) {
+                if (result.error) {
+                    showMessage(_('Error: ') + result.error);
                 } else {
-                    // do not call onChange direct, because onChange could expect some arguments
-                    $key.val(settings[id]).change(function () {
-                        onChange();
-                    }).keyup(function () {
-                        onChange();
-                    });
+                    showMessage(_('Check the log or your email'));
                 }
             });
-            onChange(false);
-            M.updateTextFields();  // function Materialize.updateTextFields(); to reinitialize all the Materialize labels on the page if you are dynamically adding inputs.
         }
-        // ... and the function save has to exist.
-        // you have to make sure the callback is called with the settings object as first param!
-        function save(callback) {
-            // example: select elements with class=value and build settings object
+
+        function saveHelper(obj, id, value) {
+            var ids = id.split('_');
+            if (ids.length === 1) {
+                obj[id] = value;
+            } else if (ids.length === 2) {
+                if (!obj[ids[0]]) obj[ids[0]] = {};
+                obj[ids[0]][ids[1]] = value;
+            } else if (ids.length === 3) {
+                if (ids[2] === 'pass') {
+                    value = encrypt('Zgfr56gFe87jJOM', value);
+                }
+
+                if (!obj[ids[0]]) obj[ids[0]] = {};
+                if (!obj[ids[0]][ids[1]]) obj[ids[0]][ids[1]] = {};
+                obj[ids[0]][ids[1]][ids[2]] = value;
+            }
+            return obj;
+        }
+
+        function getSettings() {
             var obj = {};
             $('.value').each(function () {
                 var $this = $(this);
+                var id = $this.attr('id');
+
                 if ($this.attr('type') === 'checkbox') {
-                    obj[$this.attr('id')] = $this.prop('checked');
+                    obj = saveHelper(obj, id, $this.prop('checked'))
                 } else {
-                    obj[$this.attr('id')] = $this.val();
+                    obj = saveHelper(obj, id, $this.val())
                 }
             });
-            callback(obj);
+            return obj;
+        }
+
+        function save(callback) {
+            callback(getSettings());
         }
     </script>
 </head>
+
 <body>
-<!-- you have to put your config page in a div with id adapter-container -->
+<div id="adapter-container">
 
-<div class="m adapter-container">
-    <div class="row">
-        <div class="row">
-            <div class="col s12 m2 l1">
-                <img src="husq-automower.png" class="logo">
+    <table>
+        <tr>
+            <td>
+                <img src="husq-automower.png">
+            </td>
+            <td style="padding-top: 20px;padding-left: 10px">
+                <h3 class="translate">Husqvarna Automower adapter</h3>
+            </td>
+        </tr>
+    </table>
+    <table>
+        <tr>
+            <td>
+                <label></label>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td colspan="4">
+                <h4 class="translate">Connection settings</h4>
+            </td>
+        </tr>
 
-            </div>
-            <div class="col s12 m8 l10">
-                <h6 class="translate">title</h6>
-            </div>
-        </div>
-        <div class="divider"></div>
-        <div class="row" style="background-color: #64b5f6;">
-            <div class="col s12">
-                <span class="translate">connection settings</span>
-                <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-            </div>
-        </div>
-        <div class="row">
-            <div class="input-field  col s12">
-                <input class="value" id="email" type="text" />
-                <label for="email" class="translate">e-mail</label>
-            </div>
-        </div>
-        <div class="row">
-            <div class="input-field col s12 m4 l2">
-                <input type="text" class="value" id="pwd" />
-                <label for="pwd" class="translate">password</label>
-            </div>
-            <div class="input-field col s12">
-                <input type="text" class="value" id="nickname" />
-                <label for="nickname" class="translate">nickname</label>
-            </div>
-            <!--
-                            <div class="input-field col s12">
-                                <input type="text" class="value" id="homeLocation_latitude" />
-                                <label for="homeLocation_latitude" class="translate">homeLocation_latitude</label>
-                            </div>
-                            <div class="input-field col s12">
-                                <input type="text" class="value" id="homeLocation_longitude" />
-                                <label for="homeLocation_longitude" class="translate">homeLocation_longitude</label>
-                            </div>
-            -->
-            <div class="input-field col s12">
-                <input type="text" class="value" id="homeLocation_maxDistance" />
-                <label for="homeLocation_maxDistance" class="translate">homeLocation_maxDistance</label>
-            </div>
-            <div class="input-field col s12">
-                <input type="text" class="value" id="homeLocation_name" />
-                <label for="homeLocation_name" class="translate">homeLocation_name</label>
-            </div>
 
-            <!--
-                            <div class="input-field col s1 m1">
-                                <select class="value" id="dev_sel">
-                                    <option value=0>0</option>
-                                    <option value=1>1</option>
-                                    <option value=2>2</option>
-                                    <option value=3>3</option>
-                                </select>
-                                <label for="dev_sel" class="translate">mower select</label>
-             -->
-                                <!-- Important: label must come directly after select. Label is important. -->
-            <!--
-        </div>
+        <tr>
+            <td>
+                <label class="translate" for="email">e-mail:</label>
+            </td>
+            <td>
+                <input id="email" type="text" size="40" class="value" placeholder="Husqvarna Portal e-mail address"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="pwd">password:</label>
+            </td>
+            <td>
+                <input id="pwd" type="password" size="40" class="value" placeholder="Husqvarna Portal password"/>
+            </td>
+            <td></td>
+        </tr>
+        <!--
+        <tr>
+            <td></td>
+            <td>
+                <button id="get_mowers" class="translate">get mowers</button>
+            </td>
+            <td></td>
+        </tr>
         -->
-        -->
-    </div>
-    <div class="divider"></div>
-    <div class="row" style="background-color: #64b5f6;">
-        <div class="col s12">
-            <span class="translate">additional settings</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
+        <tr>
+            <td>
+                <label class="translate" for="nickname">nickname:</label>
+            </td>
+            <td>
+                <input id="nickname" type="text" size="40" class="value" placeholder="Husqvarna Portal automower name"/>
+            </td>
+            <td></td>
+        </tr>
 
-    </div>
-    <div class="row">
-        <div class="input-field  col s12">
-            <input class="value" id="enableJson" type="checkbox" /><span class="translate">add raw data</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="houerKm" type="checkbox" /><span class="translate">Distance and time in min and m</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="pollActive" type="text" size="6" maxlength="4" /><span class="translate">query intervall mower active</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="pollInactive" type="text" size="6" maxlength="4" /><span class="translate">query intervall mower inactive</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="idTimeZoneOffset" type="text" />
-            <label for="idTimeZoneOffset" class="translate">idTimeZoneOffset</label>
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="idRainSensor" type="text" />
-            <label for="idRainSensor" class="translate">idRainSensor</label>
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="rainValue" type="text" />
-            <label for="rainValue" class="translate">rainValue</label>
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="stopOnRainEnabled" type="checkbox" /><span class="translate">stop mover on rain</span>
-            <!-- Important: span must come directly after checkbox input (only by checkbox the span will be used!) -->
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="idWeatherRainForecast" type="text" />
-            <label for="idWeatherRainForecast" class="translate">idWeatherRainForecast</label>
-        </div>
-        <div class="input-field  col s12">
-            <input class="value" id="stopOnRainPercent" type="text" />
-            <label for="stopOnRainPercent" class="translate">stopOnRainPercent</label>
-        </div>
-    </div>
-</div>
-</div>
+        <tr>
+            <td colspan="4">
+                <br>
+                <h4 class="translate">Location</h4>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="homeLocation_name">location name:</label>
+            </td>
+            <td>
+                <input id="homeLocation_name" type="text" size="40" class="value" placeholder="location name"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="homeLocation_maxDistance">max distance from base (m):</label>
+            </td>
+            <td>
+                <input id="homeLocation_maxDistance" type="text" size="2" class="value" value="80"/>
+            </td>
+            <td></td>
+        </tr>
 
+        <tr>
+            <td colspan="5">
+                <br>
+                <h4 class="translate">Additional Settings</h4>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="pollActive">query intervall mower active (s):</label>
+            </td>
+            <td>
+                <input id="pollActive" type="text" size="2" class="value" value="61"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="pollInactive">query intervall mower inactive (s):</label>
+            </td>
+            <td>
+                <input id="pollInactive" type="text" size="2" class="value" value="301"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="saveRawData">save raw data:</label>
+            </td>
+            <td>
+                <input id="saveRawData" type="checkbox" class="value"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="extendedStatistic">write extended statistic:</label>
+            </td>
+            <td>
+                <input id="extendedStatistic" type="checkbox" class="value"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td colspan="5">
+                <label class="translate" for="extendedStatisticHelp">(accumulate current values, daily and overall for mowing
+                    time, covered distance, charge cycle)</label>
+            </td>
+            <td></td>
+        </tr>
+
+        <tr>
+            <td colspan="5">
+                <br>
+                <h4 class="translate">Rain Detection</h4>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="idRainSensor">idRainSensor:</label>
+            </td>
+            <td>
+                <input id="idRainSensor" type="text" size="40" class="value"
+                       placeholder="ioBroker state.ID for a rain detector"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="rainSensorValue">rain value:</label>
+            </td>
+            <td>
+                <input id="rainSensorValue" type="text" size="40" class="value" value="[bool,true]"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="stopOnRainEnabled">stop on rain enabled:</label>
+            </td>
+            <td>
+                <input id="stopOnRainEnabled" type="checkbox" class="value"/>
+            </td>
+            <td></td>
+        </tr>
+        <tr>
+            <td>
+                <label class="translate" for="waitAfterRain_m">waittime after rain (min):</label>
+            </td>
+            <td>
+                <input id="waitAfterRain_m" type="text" size="3" class="value" value="180"/>
+            </td>
+            <td></td>
+        </tr>
+
+        <tr>
+            <td colspan="3">&nbsp;</td>
+        </tr>
+    </table>
+
+</div>
 </body>
 </html>

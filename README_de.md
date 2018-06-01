@@ -10,14 +10,31 @@ Getestet mit 450X und 315X.
 
 Für die Kommunikation mit dem Husqvarna-Webserver werden die Skripte von [rannmann] verwendet (https://github.com/rannmann/node-husqvarna-automower).
 
+Via dem Aktions-State "husq-automower.x.mower.action" können folgende Aktionen ausgelöst werden:
+=  1 - start Mäher
+=  2 - stopp Mäher
+=  3 - park Mäher
+=  9 - query Status (wenn Schdeuler gestoppt, mower.scheduleTime == 0)
+= 77 - Regentaste, toggle mower.stoppedDueRain: true - park Mäher wegen Regen, false - nach konfigurierter Wartezeit wird Mäher wieder gestartet
+       arbeitet parallel zum optionalem Regensensor
+= 91 - stopp Statusscheduler (mower.scheduleTime == 0)
+= 92 - start Statusscheduler
+
 ## Installation
 Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von diesem Adapter nicht mehr unterstützt.
 
 ## Einstellungen
 - Bei E-mail und Passwort müssen die Daten eingeben werden, mit denen man bei Husqvarna registriert und der Mower verbunden ist.
+- max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mover.sendMessage
+
 
 ## Changelog
 
+#### 0.3.4
+* (Greyhound) new configuration site
+* (Greyhound) correction in accumulate statistic values
+* (Greyhound) additional statistic values
+* (Greyhound) bugfixes in rain handler
 #### 0.3.3
 * (Greyhound) Korrektur Automower datetime mit ZeitzonenOffset
 * (Greyhound) weitere kleinere Korrekturen
@@ -32,7 +49,7 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 ## License
 The MIT License (MIT)
 
-Copyright (c) 2017 MeisterTR <meistertr.smarthome@gmail.com>
+Copyright (c) 2018 truegreyhound <truegreyhound@gmx.net>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
