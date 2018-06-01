@@ -2,21 +2,14 @@
 ioBroker.husq-automower
 =============
 
-[![NPM version](http://img.shields.io/npm/v/iobroker.landroid-s.svg)](https://www.npmjs.com/package/iobroker.landroid-s)
-[![Downloads](https://img.shields.io/npm/dm/iobroker.landroid-s.svg)](https://www.npmjs.com/package/iobroker.landroid-s)
-
-[![NPM](https://nodei.co/npm/iobroker.husq-automower.png?downloads=true)](https://nodei.co/npm/iobroker.landroid-s/)
-
-**Tests:** Linux/Mac: [![Travis-CI](https://api.travis-ci.org/MeisterTR/ioBroker.landroid-s.svg?branch=master)](https://travis-ci.org/MeisterTR/ioBroker.landroid-s)
-Windows: [![AppVeyor](https://ci.appveyor.com/api/projects/status/github/MeisterTR/ioBroker.landroid-s?branch=master&svg=true)](https://ci.appveyor.com/project/MeisterTR/ioBroker-landroid-s/)
-
-
 [Deutsche Beschreibung hier](README_de.md)
 
 This adapter connects IoBroker with your Husqvarna Automower with Connect-Modul
 Mowing times, battery level and various other data are read out from the mower.
 The adapter can control the mower (start, stop, park).
 Tested with 450X and 315X.
+
+For communication with Husqvarna web server, the adapter use scripts from [rannmann] (https://github.com/rannmann/node-husqvarna-automower).
 
 ## installation
 At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
@@ -26,9 +19,12 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.3
+* (Greyhound) correct automower datetime with timezone offset
+* (Greyhound) other small corrections
 #### 0.3.2
 * (Greyhound) fix a problem in adapter.on('objectChange', ...
-*
+* (Greyhound) div. renamings and bugfixes
 #### 0.3.1
 * (Greyhound) initial release
 #### < 0.3.1

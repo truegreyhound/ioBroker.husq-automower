@@ -13,63 +13,50 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 0.3.2.0
+//!V! 0.3.3.0
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
+//!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat
 
+//!P! Wenn husq-automower.1.info.connected === false --> Alarm --> Stromausfall, gekappt oder geklaut
 
-// !P! wenn Adapter beendet wird dailyData sichern, Welche? : ???
+//!P! Mäher angehoben --> Alarm-Message
 
-// !P! mWaitAfterRainTimer is not used !?
-// !P! mWaitAutoTimer is not used !?
-
-// !P! NextStartTime == UTC + 2h
+//!P! mWaitAfterRainTimer is not used !?
+//!P! mWaitAutoTimer is not used !?
+//!P! dpAutoTimerWatch anzeigen
 
 //!P! in config button to test connection data and fill Combobox to select a mower, on one, fill direct
 
 //!P! kurz vor Autostart mower (wie auslesen, sonst manuell eintragen) prüfen ob Regen, wenn ja, dann mower stop
 
-//!P! Bei Fehler die aktuellen GPS-Koordinaten speichern, passiert doch oder?
-
 //!P! mover.isCutting scheint nicht gesetzt zu werden!?
 
 //!P! es scheint einen Befehl "Pause" zu geben, unklar ist zumindest, wie der Status Pause entsteht und ob Pause bedeutet auf aktueller Position bleiben oder Pause in Ladestation
-//!P! Wenn Mover in Status Pause wechselt, prüfen, ob in Ladestation (GPS + Abweichung, Druckschalter (in Arbeit), ???), Wenn nicht, dann Telegram-Nachricht und nach Zeit XXX automatisch parken lassen ?!
-//!P! Druckschalter an Raspberry anschließen, der erkennt, ob Mover in Ladestation
+//!P! Wenn Mower in Status Pause wechselt, prüfen, ob in Ladestation (GPS + Abweichung, Druckschalter (in Arbeit), ???), Wenn nicht, dann Telegram-Nachricht und nach Zeit XXX automatisch parken lassen ?!
+//!P! Druckschalter an Raspberry anschließen, der erkennt, ob Mower in Ladestation
 //!P! Wenn Druckschalter anspricht und letzter Status != LEAVING und altueller Status != CUTTING (testen!) --> ALARM
 
 //!P! via einem Scheduler (setInterval) prüfen, dass Status etc. aktualisiert wird, wenn nicht bzw. http-Fehler oder sich trotz CUTTING GPS-Daten nicht ändern --> ALARM
 
-//!P! Aus Batteriestand beim Start (cutting) und bei Rückkehr (park) und dem Verbrauch den aktuellen Wirkungsgrad der Batterie berechnen
-
-//!P! Beim Start (cutting) Startzeitpunkt setzen (do) und Endzeit löschen.
-//!P! Wenn fertig (parking) dann Endzeit speichern
-
 //!P! Batteriekapazität überwachen, wenn unter xx (10% ?) sinkt, Alarm per telegramm
 
-//!P! Wenn Mover geparkt, dann Timer programmieren ermöglichen, der Mover wieder startet
+//!P! Wenn Mower geparkt, dann Timer programmieren ermöglichen, der Mower wieder startet
 
-//!P! Wenn Mover durch Regenfunktion geparkt, prüfen, warum restart nicht klappt
+//!P! Wenn Mower durch Regenfunktion geparkt, prüfen, warum restart nicht klappt
 
 //!P! Regentaste, wenn gedrückt den Mäher parken und erst wieder starten, wenn Regentimer den Start wieder freigibt
 //!P! Taste wirkt // zum "Regensensor"
 
-//!P! idStopOnRain
+//!P! idnStoppedDueRain
 //!P! - gesetzt durch forecast
-//!P! - gesetzt durch Regensensor (in Vorbereitung), muss per telegramm or MQTT von Uelitz nach Berlin
+//!P! - gesetzt durch Regensensor
 
-
-//!P! "Pause"-Taste --> mover parken, startet Timer mit einstellbarer Zeit (oder jeder Pausendruck erhöht Pausenwert um X), nach Ablaus geht Mover wieder in Normalbetrieb
+//!P! "Pause"-Taste --> mower parken, startet Timer mit einstellbarer Zeit (oder jeder Pausendruck erhöht Pausenwert um X), nach Ablaus geht Mower wieder in Normalbetrieb
 
 //!P! Es gibt wohl noch weitere Befehle ?? add_push_id, remove_push_id <-- ggf. nur für iOS/Android; geo_status, get_mower_settings
 
-//!P! beim Speichern der Datumsinformationen Zeitzone beachten, scheint lokale Zeit zu sein LC --> GC
-//!P! iOS-App sagt nächster Start "Dienstag 00:00"; in Datensatz steht "2017-07-11 02:00:00"; Welche Anzeige ist richtig?
-//!P! im DP müsste doch dann "2017-07-10 22:00:00" stehen als GC
-
 //!P! Idee, Wenn Cutting und bei den letzten 2 Statusabfragen keine Änderung des Standortes wahrscheinlich Fehler oder?
-
-//!P! dpAutoTimerWatch anzeigen
 
 /*
 Handy-App
@@ -81,7 +68,7 @@ Handy-App
 - Datum/Uhrzeit == lokale Zeit ???
 - Rückmeldung Mähen erforderlich (Mähwiderstand)
 - Rückmeldung aktiver Mähbereich
-- bei Statusänderung sollte der Auslöser "festgehalten" werden: mover timer, App + account, via Web-API + account
+- bei Statusänderung sollte der Auslöser "festgehalten" werden: mower timer, App + account, via Web-API + account
 */
 
 /*
@@ -106,10 +93,11 @@ Status
 - OFF_DISABLED
 - ERROR
 - PARKED_PARKED_SELECTED
+- PARKED_TIMER
 - PAUSED
 
 ErrorCodes
- 2 - kein Schleifensignal, Mover fährt aber weiter, unkritisch
+ 2 - kein Schleifensignal, Mower fährt aber weiter, unkritisch
 13 - kein Antrieb
 25 - Mäheinheit ist blockiert
 69 - ????
@@ -129,19 +117,17 @@ OperatingMode
 
 
 // you have to require the utils module and call adapter function
-let utils = require(__dirname + '/lib/utils'); // Get common adapter utils
+const utils = require(__dirname + '/lib/utils'); // Get common adapter utils
 // you have to call the adapter function and pass a options object
 // name has to be set and has to be equal to adapters folder name and main file name excluding extension
 // adapter will be restarted automatically every time as the configuration changed, e.g system.adapter.template.0
-let adapter = utils.Adapter('husq-automower');
+const adapter = utils.Adapter('husq-automower');
 
-let HusqApiRequest = require(__dirname + '/lib/HusqApiRequest');
-let husqApi = new HusqApiRequest(adapter);
-let husqSchedule = require('node-schedule');
+const HusqApiRequest = require(__dirname + '/lib/HusqApiRequest');
+const husqApi = new HusqApiRequest(adapter);
+const husqSchedule = require('node-schedule');
 
-//var weekday = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
-let idnMowerConnected = 'info.connected',
+const idnMowerConnected = 'info.connected',
     idnMowerFirmware = 'info.firmware',
     idnMowerNickname = 'info.nickname',
     idnMowerID = 'info.mower_id',
@@ -165,18 +151,22 @@ let idnMowerConnected = 'info.connected',
     idnLastLocationLongitude = 'mower.lastLocation.longitude',
     idnLastLocationTimestamp = 'mower.lastLocation.timestamp',
 
-    idnBatteryChargeCycle = 'mower.statistics.batteryChargeCycle',
-    idnCharchingStartTime = 'mower.statistics.chargingBatteryStarttime',
+    idnBatteryChargeCycleDaily = 'mower.statistics.batteryChargeCycleDaily',
+    idnBatteryEfficiencyFactor = 'mower.statistics.batteryEfficiencyFactor',
+    idnChargingStartTime = 'mower.statistics.chargingBatteryStarttime',
     idnChargingTimeBatteryCurrent = 'mower.statistics.chargingTimeBatteryCurrent',
+    idnChargingTimeBatteryDaily = 'mower.statistics.chargingTimeBatteryDaily',
     idnChargingTimeBatteryNew = 'mower.statistics.chargingTimeBatteryNew',
     idnCurrentCoveredDistance = 'mower.statistics.currentCoveredDistance',
+    idnCoveredDistanceDaily = 'mower.statistics.coveredDistanceDaily',
     idnLastMowingTime = 'mower.statistics.lastMowingTime',
     idnLastCoveredDistance = 'mower.statistics.lastCoveredDistance',
     idnLastStationReturnTime = 'mower.statistics.lastStationReturnTime',
     idnMowingTime = 'mower.statistics.mowingTime',
+    idnMowingTimeDaily = 'mower.statistics.mowingTimeDaily',
     idnMowingStartTime = 'mower.statistics.mowingStartTime',
-    idnMowingTimeBatteryCurrent = 'mower.statistics.mowingTimeBatteryCurrent',
     idnMowingTimeBatteryNew = 'mower.statistics.mowingTimeBatteryNew',
+    idnOverallBatteryChargeCycle = 'mower.statistics.overallBatteryChargeCycle',
     idnOverallMowingTime = 'mower.statistics.overallMowingTime',
     idnOverallCoveredDistance = 'mower.statistics.overallCoveredDistance',
 
@@ -206,7 +196,8 @@ let idnMowerConnected = 'info.connected',
     idnRawResponse = 'mower.rawResponse',
     idnRawResponseGeo = 'mower.rawResponse_geo',
     idnSendMessage = 'mower.sendMessage',
-    ThisIsTheEnd;
+    UrlGoogleMaps = 'http://maps.google.com/maps?q=',
+    ThisIsTheEnd = 'ThisIsTheEnd';
 
 
 let mobjMower = [],
@@ -222,27 +213,30 @@ let mobjMower = [],
     mLastErrorCodeTimestamp = 0,
     mJsonLastLocations = [],
     mDist = 0,
+    mDistDaily = 0,
     mMaxDistance = 0,
     mLastLocationLongi = 0,
     mLastLocationLati = 0,
-    mTime = 0,
     mBatteryPercent = 0,
     mMowingTime = 0,
+    mLastMowingTime = 0,
+    mMowingTimeDaily = 0,
+    mMowingTimeBatteryNew = 0,
     mStartMowingTime = 0,
-    mMowingTimeBatteryCurrent = 0,
     mSearchingStartTime = 0,
-    mCharchingStartTime = 0,
+    mChargingStartTime = 0,
     mChargingTimeBatteryCurrent = 0,
+    mChargingTimeBatteryDaily = 0,
     mChargingTimeBatteryNew = 0,
     mScheduleStatus = null,
     mScheduleTime = 1,
-    mTimeZoneOffset = 0,
+    mTimeZoneOffset = new Date().getTimezoneOffset(),       // offset in minutes
     mWaitAfterRainTimer = null,
     mWaitAutoTimer = null,
-    mBatteryChargeCycle = 0,
+    mBatteryChargeCycleDaily = 0,
     mLastStatusChangeTime = 0,
     mScheduleDailyAccumulation = null,
-    mUrlGoogleMaps = 'http://maps.google.com/maps?q=',
+    mWaitAfterRain_m = 0,
     ThisIsTheEnd2;
 
 
@@ -331,14 +325,12 @@ function createState(name, value, desc, _write, _unit) {
             }
         });
     }
-//    if(typeof(value) !== 'undefined')
-//        setStateArray.push({name: name, val: value});
-}
+} // createState(9
 
 
 function createChannels() {
 
-    var fctName = 'createChannels';
+    const fctName = 'createChannels';
     adapter.log.debug(fctName + ' started');
 
     adapter.setObjectNotExists('info', {
@@ -403,7 +395,7 @@ function createChannels() {
 
 function createDPs() {
 
-    var fctName = 'createDPs',
+    const fctName = 'createDPs',
         enableJson = adapter.config.enableJson;
 
     adapter.log.debug(fctName + ' started');
@@ -434,17 +426,21 @@ function createDPs() {
     createState(idnLastLocationTimestamp, 0);
 
     createState(idnMowingTime, 0, idnMowingTime, false, "min.");
+    createState(idnMowingTimeDaily, 0, idnMowingTimeDaily, false, "min.");
     createState(idnMowingStartTime, 0);
-    createState(idnMowingTimeBatteryCurrent, 0, idnMowingTimeBatteryCurrent, false, "min.");
     createState(idnMowingTimeBatteryNew, 0, idnMowingTimeBatteryNew, false, "min.");
-    createState(idnBatteryChargeCycle, 0);
-    createState(idnCharchingStartTime, 0);
+    createState(idnBatteryChargeCycleDaily, 0);
+    createState(idnBatteryEfficiencyFactor, 0, idnBatteryEfficiencyFactor, false, "%");
+    createState(idnChargingStartTime, 0);
     createState(idnChargingTimeBatteryCurrent, 0, idnChargingTimeBatteryCurrent, false, "min.");
+    createState(idnChargingTimeBatteryDaily, 0, idnChargingTimeBatteryDaily, false, "min.");
     createState(idnChargingTimeBatteryNew, 0, idnChargingTimeBatteryNew, false, "min.");
     createState(idnCurrentCoveredDistance, 0, idnCurrentCoveredDistance, false, "m");
+    createState(idnCoveredDistanceDaily, 0, idnCoveredDistanceDaily, false, "m");
     createState(idnLastMowingTime, 0, idnLastMowingTime, false, "min.");
     createState(idnLastCoveredDistance, 0, idnLastCoveredDistance, false, "m");
     createState(idnLastStationReturnTime, 0, idnLastStationReturnTime, false, "min.");
+    createState(idnOverallBatteryChargeCycle, 0);
     createState(idnOverallMowingTime, 0, idnOverallMowingTime, false, "h");
     createState(idnOverallCoveredDistance, 0, idnOverallCoveredDistance, false, "km");
 
@@ -453,7 +449,7 @@ function createDPs() {
     createState(idnCurrentErrorCode, 0);
     createState(idnCurrentErrorCodeTS, 0);
     createState(idnLastAction, 'unkonwn');
-    createState(idnLastDockingTime, 0, idnLastDockingTime, false, "min.");
+    createState(idnLastDockingTime, 0);
     createState(idnLastErrorCode, 0);
     createState(idnLastErrorCodeTS, 0);
     createState(idnLastHttpStatus, 0);
@@ -493,7 +489,7 @@ function createDataStructure(adapter) {
 
     createDPs();
 
-}
+} // createDataStructure()
 
 
 function parseBool(value) {
@@ -515,13 +511,13 @@ adapter.on('stateChange', function (id, state) {
     if (state && !state.ack) {
         adapter.log.debug('stateChange, id: ' + id + '; state: ' + JSON.stringify(state));       // ld: husq-automower.0.mower.lastLocation.longitude; state: {"val":11.435046666666667,"ack":false,"ts":1524829008532,"q":0,"from":"system.adapter.husq-automower.0","lc":1524829008532}
 
-        var iddp = id.substr(adapter.namespace.length + 1),
+        let iddp = id.substr(adapter.namespace.length + 1),
             fctName = '';
 
         if(id === adapter.config.idRainSensor) {
             // adapter.config.RainSensorValue - [bool, true]
             fctName = 'subscription rainsensor change';
-            var bRain = parseBool(state.val),
+            let bRain = parseBool(state.val),
                 sMsg = '',
                 vTest = dapter.config.RainSensorValue;
 
@@ -547,7 +543,7 @@ adapter.on('stateChange', function (id, state) {
             fctName = 'Subscriber rainforcast';
             adapter.log.debug(fctName + ',  id: "' + id + '"; state.val: ' + state.val);
 //!P!
-            var sMsg = '',
+            let sMsg = '',
                 mRainPercent = getState(idWeatherRainForecastPercent).val,
                 mRain1h = getState(idWeatherRainForecast1h).val,
                 mRainPercent1h = getState(idWeatherRainForecastPercent1h).val;
@@ -560,18 +556,18 @@ adapter.on('stateChange', function (id, state) {
 
             if (state.val === 0 && mRainPercent === 0) {
                 // no rain in forcast
-                if (waitAfterRainTimer !== null) {
-                    clearTimeout(waitAfterRainTimer);
+                if (mWaitAfterRainTimer !== null) {
+                    clearTimeout(mWaitAfterRainTimer);
 
                     adapter.setState(idnTimerAfterRainStartAt, 0, true);
                 }
 
-                var timeout = waitAfterRain_m * 60 * 1000;          // 7200000
-                waitAfterRainTimer = setTimeout(startMowerAfterAutoTimerCheck, timeout);
+                let timeout = mWaitAfterRain_m * 60 * 1000;          // 7200000
+                mWaitAfterRainTimer = setTimeout(startMowerAfterAutoTimerCheck, timeout);
 
                 adapter.setState(idnTimerAfterRainStartAt, new Date().getTime(), true);
 
-                sMsg = fctName + ' changed to no rain; wait ' + waitAfterRain_m + ' min. for starting mower';
+                sMsg = fctName + ' changed to no rain; wait ' + mWaitAfterRain_m + ' min. for starting mower';
                 adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' changed', state.val, 1, 'Tg,EL']), true);
             }
 
@@ -651,11 +647,12 @@ adapter.on('stateChange', function (id, state) {
                 fctName = 'subscrition StoppedDueRain changed';
                 adapter.log.debug(fctName + ',  id: "' + idnStoppedDueRain + '"; state.val: ' + state.val);
 
-                var sMsg = '';
+                let sMsg = '';
                 adapter.log.debug(fctName + ' mLastStatus: ' + mLastStatus + ',  adapter.config.stopOnRainEnabled: ' + adapter.config.stopOnRainEnabled);
 
                 if (state.val === true && adapter.config.stopOnRainEnabled === true) {
-                    if(mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CHARGING') {	// PARKED_PARKED_SELECTED ??
+                    // it's raining
+                    if(mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO' || mLastStatus === 'OK_CHARGING') {	// PARKED_PARKED_SELECTED ??
                         mobjMower.sendCommand(mobjMower.command.park, (err, msg) => {
                             if (err) {
                                 adapter.log(msg);
@@ -664,8 +661,8 @@ adapter.on('stateChange', function (id, state) {
                             }
                         });
 
-                        if (waitAfterRainTimer !== null) {
-                            clearTimeout(waitAfterRainTimer);
+                        if (mWaitAfterRainTimer !== null) {
+                            clearTimeout(mWaitAfterRainTimer);
 
                             adapter.setState(idTimerAfterRainStartAt, 0, true);
                         }
@@ -677,19 +674,19 @@ adapter.on('stateChange', function (id, state) {
 
                 if (state.val === false && adapter.config.stopOnRainEnabled === true) {
                     // rain is over, wait if gras is dry
-                    if (waitAfterRainTimer !== null) {
-                        clearTimeout(waitAfterRainTimer);
+                    if (mWaitAfterRainTimer !== null) {
+                        clearTimeout(mWaitAfterRainTimer);
 
                         adapter.setState(idTimerAfterRainStartAt, 0, true);
                     }
 
-                    var timeout = waitAfterRain_m * 60 * 1000;          // 7200000
+                    let timeout = mWaitAfterRain_m * 60 * 1000;          // 7200000
 
-                    waitAfterRainTimer = setTimeout(startMowerAfterAutoTimerCheck, timeout);
+                    mWaitAfterRainTimer = setTimeout(startMowerAfterAutoTimerCheck, timeout);
 
                     adapter.setState(idTimerAfterRainStartAt, new Date().getTime(), true);
 
-                    sMsg = fctName + ' changed to no rain; wait ' + waitAfterRain_m + ' min. for starting mower';
+                    sMsg = fctName + ' changed to no rain; wait ' + mWaitAfterRain_m + ' min. for starting mower';
                     adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' changed', state.val, 1, 'Tg,EL']), true);
                 }
 
@@ -699,7 +696,7 @@ adapter.on('stateChange', function (id, state) {
         }
 
     }
-});
+}); // adapter.on('stateChange')
 
 
 // Some message was sent to adapter instance over message box. Used by email, pushover, text2speech, ...
@@ -718,10 +715,10 @@ adapter.on('message', function (obj) {
 
 function getDistance(lat1, long1, lat2, long2) {
     // GPS_DISTANCE(lat1 DOUBLE, long1 DOUBLE, lat2 DOUBLE, long2 DOUBLE)
-    var fctName = 'getDistance';
+    const fctName = 'getDistance';
     //adapter.log.debug(fctName + ' started' + '; lat1: ' + lat1 + '; long1: ' + long1 + '; lat2: ' + lat2 + '; long2: ' + long2);
 
-    var R = 6371, // Radius of the earth in km
+    let R = 6371, // Radius of the earth in km
         dLat = (lat2 - lat1) * Math.PI / 180,  // deg2rad below
         dLon = (long2 - long1) * Math.PI / 180,
         a = 0.5 - Math.cos(dLat)/2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (1 - Math.cos(dLon))/2,
@@ -737,7 +734,7 @@ function getDistance(lat1, long1, lat2, long2) {
 
 function checkAMatHome(lat2, long2) {
     // GPS_DISTANCE(lat1 DOUBLE, long1 DOUBLE, lat2 DOUBLE, long2 DOUBLE)
-    var fctName = 'checkAMatHome';
+    const fctName = 'checkAMatHome';
     adapter.log.debug(fctName + ' started' + '; lat2: ' + lat2 + '; long2: ' + long2);
     adapter.log.debug(fctName + ' mHomeLocationLatitude: ' + mHomeLocationLatitude + '; mHomeLocationLongitude: ' + mHomeLocationLongitude + '; mMaxDistance: ' + mMaxDistance);
 
@@ -747,21 +744,20 @@ function checkAMatHome(lat2, long2) {
         return;
     }
 
-    var R = 6371, // Radius of the earth in km
+    let R = 6371, // Radius of the earth in km
         dLat = (lat2 - mHomeLocationLatitude) * Math.PI / 180,  // deg2rad below
         dLon = (long2 - mHomeLocationLongitude) * Math.PI / 180,
-        a = 0.5 - Math.cos(dLat)/2 + Math.cos(mHomeLocationLatitude * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (1 - Math.cos(dLon))/2,
-
+        a = 0.5 - Math.cos(dLat)/2 + Math.cos(mHomeLocationLatitude * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (1 - Math.cos(dLon)) / 2,
         dist = R * 2 * Math.asin(Math.sqrt(a)) * 1000;
 
     adapter.setState(idnHomeLocationCurrentDistance, Math.round(dist));
-    //var dist = Math.acos(Math.sin(degrees_to_radians(mHomeLocationLatitude)) * Math.sin(degrees_to_radians(lat2)) + Math.cos(degrees_to_radians(mHomeLocationLatitude)) * Math.cos(degrees_to_radians(lat2)) * Math.cos(degrees_to_radians(long2) - degrees_to_radians(mHomeLocationLongitude))) * 6371 * 1000;
+    //let dist = Math.acos(Math.sin(degrees_to_radians(mHomeLocationLatitude)) * Math.sin(degrees_to_radians(lat2)) + Math.cos(degrees_to_radians(mHomeLocationLatitude)) * Math.cos(degrees_to_radians(lat2)) * Math.cos(degrees_to_radians(long2) - degrees_to_radians(mHomeLocationLongitude))) * 6371 * 1000;
 
     if (dist > mMaxDistance) {
         // alarm
         adapter.log.error(fctName + ' dist > mMaxDistance: ' + dist - mMaxDistance);
 
-        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + mUrlGoogleMaps + lat2 + ',' + long2, 'mower state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
+        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
     }
 
     adapter.log.debug(fctName + ' finished; dist: ' + dist);
@@ -770,7 +766,7 @@ function checkAMatHome(lat2, long2) {
 
 
 function createStatusScheduler() {
-    var fctName = 'createStatusScheduler';
+    const fctName = 'createStatusScheduler';
     adapter.log.debug(fctName + ' started');
 
     if(mScheduleStatus !== null) {
@@ -795,12 +791,12 @@ function createStatusScheduler() {
 } // createStatusScheduler()
 
 
-function startMoverAfterAutoTimerCheck() {
-    var fctName = 'startMoverAfterAutoTimerCheck';
+function startMowerAfterAutoTimerCheck() {
+    const fctName = 'startMowerAfterAutoTimerCheck';
     adapter.log.debug(fctName + ' started');
 
 //!P! ?? welcher Status noch?
-    if(mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus !== 'PARKED_PARKED_SELECTED') {
+    if(mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus !== 'PARKED_PARKED_SELECTED' || mCurrentStatus !== 'PARKED_TIMER') {
         mobjMower.sendCommand(mobjMower.command.start, (err, msg) => {
             if (err) {
                 adapter.log(msg);
@@ -809,7 +805,7 @@ function startMoverAfterAutoTimerCheck() {
             }
         });
 
-        adapter.log.debug(fctName + '; mover started');
+        adapter.log.debug(fctName + '; mower started');
     }
 
     mWaitAutoTimer = null;
@@ -817,11 +813,14 @@ function startMoverAfterAutoTimerCheck() {
 
     adapter.log.debug(fctName + ' finished');
 
-} // startMoverAfterAutoTimerCheck()
+} // startMowerAfterAutoTimerCheck()
 
 
-function dailyAccumulation() {
-    var fctName = 'dailyAccumulation';
+function dailyAccumulation(bCheck) {
+    const fctName = 'dailyAccumulation';
+
+    if(typeof(bCheck) === 'undefined')
+        bCheck = false;
 
     adapter.log.debug(fctName + ' started');
 
@@ -837,18 +836,25 @@ function dailyAccumulation() {
 
     adapter.log.debug(fctName + '; add current covered distance to overall distance ...');
     // add current covered distance to overall distance in km
-    adapter.getState(idnCurrentCoveredDistance, function (errCCD, stateCCD) {
-        if (!errCCD && stateCCD) {
-            adapter.getState(idnOverallCoveredDistance, function (errOCD, stateOCD) {
-                if (!errOCD && stateOCD) {
-                    adapter.setState(idnOverallCoveredDistance, (stateOCD.val + (stateCCD.val / 1000)), true);       // distance in km
-                    adapter.log.debug(fctName + '; overall distance: ' + stateOCD.val + ': current covered distance: ' + stateCCD.val / 1000);
+    adapter.getState(idnCoveredDistanceDaily, function (errCDD, stateCDD) {
+        if (!errCDD && stateCDD) {
+            adapter.log.debug(fctName + '; add current covered distance; bCheck: ' + bCheck + '; stateCDD.ts: ' + stateCDD.ts + '; new Date(00): ' + (new Date().setHours(0, 0, 0, 0)) + '; stateCDD.val: ' + stateCDD.val);
+            if(bCheck === false || (stateCDD.ts <= (new Date().setHours(0, 0, 0, 0)) && stateCDD.val > 0)) {
+                adapter.getState(idnOverallCoveredDistance, function (errOCD, stateOCD) {
+                    if (!errOCD && stateOCD) {
+                        adapter.setState(idnOverallCoveredDistance, Math.round(stateOCD.val + (stateCDD.val / 1000), 3), true);       // distance in km
+                        adapter.log.debug(fctName + '; overall distance: ' + stateOCD.val + ': current covered distance: ' + stateCDD.val / 1000);
 
-                    // move current covered distance to last distance and reset current
-                    adapter.setState(idnLastCoveredDistance, Math.round(stateCCD.va), true);
-                    adapter.setState(idnCurrentCoveredDistance, 0, true);
-                }
-            });
+                        // move current covered distance to last distance and reset current
+                        adapter.log.debug(fctName + '; add current covered distance; lastCoveredDistance: ' + stateCDD.val);
+                        adapter.setState(idnLastCoveredDistance, stateCDD.val, true);
+                        adapter.setState(idnCurrentCoveredDistance, 0, true);
+                        adapter.setState(idnCoveredDistanceDaily, 0, true);
+                        mDist = 0;
+                        mDistDaily = 0;
+                    }
+                });
+            }
         }
     });
 
@@ -856,25 +862,50 @@ function dailyAccumulation() {
     // move lastlocations to lastday locations
     adapter.getState(idnLastLocations, function (errLC, stateLC) {
         if (!errLC && stateLC) {
-            adapter.setState(idnLastdayLocations, stateLC.val, true);
-            adapter.setState(idnLastLocations, '[]', true);
+            if(bCheck === false || (stateLC.ts <= new Date().setHours(0, 0, 0, 0) && stateLC.val !== '[]')) {
+                adapter.setState(idnLastDayLocations, stateLC.val, true);
+                adapter.setState(idnLastLocations, '[]', true);
+            }
         }
     });
 
-    adapter.log.debug(fctName + '; add current mowing time to overall working time ...');
-    // add current mowing time to overall working time
-    adapter.getState(idnMowingTime, function (errWT, stateWT) {
-        if (!errWT && stateWT) {
-            adapter.getState(idnOverallMowingTime, function (errOWT, stateOWT) {
-                if (!errOWT && stateOCD) {
-                    adapter.setState(idnOverallMowingTime,  (stateOWT.val + (stateWT.val / 60)));
-                    adapter.log.debug(fctName + '; overall mowing time: ' + stateOWT.val + ': current mowing time: ' + stateWT.val / 60);
+    adapter.log.debug(fctName + '; add daily mowing time to overall mowing time ...');
+    // add current mowing time to overall mowing time
+    adapter.getState(idnMowingTimeDaily, function (errMTD, stateMTD) {
+        if (!errMTD && stateMTD) {
+            if(bCheck === false || (stateMTD.ts <= new Date().setHours(0, 0, 0, 0) && stateMTD.val > 0)) {
+                adapter.getState(idnOverallMowingTime, function (errOMT, stateOMT) {
+                    if (!errOMT && stateOMT) {
+                        adapter.setState(idnOverallMowingTime, Math.round(stateOMT.val + (stateMTD.val / 60)), 2);       // in h
+                        adapter.log.debug(fctName + '; overall mowing time: ' + stateOMT.val + ': current mowing time: ' + stateMTD.val / 60);
 
-                    // move current working time to last working time and reset current
-                    adapter.setState(idnLastMowingTime, stateWT.val, true);
-                    adapter.setState(idnMowingTime, 0, true);
-                }
-            });
+                        // reset daily mowing time
+                        adapter.setState(idnMowingTime, 0, true);
+                        adapter.setState(idnMowingTimeDaily, 0, true);
+                        mMowingTimeDaily = 0;
+                        mMowingTime = 0;
+                    }
+                });
+            }
+        }
+    });
+
+    adapter.log.debug(fctName + '; add daily battery charging cycle to overall charging cycle ...');
+    // add daily battery charging cycle to overall charging cycle
+    adapter.getState(idnBatteryChargeCycleDaily, function (errCCD, stateCCD) {
+        if (!errCCD && stateCCD) {
+            if(bCheck === false || (stateCCD.ts <= new Date().setHours(0, 0, 0, 0) && stateCCD.val > 0)) {
+                adapter.getState(idnOverallBatteryChargeCycle, function (errOBCC, stateOBCC) {
+                    if (!errOBCC && stateOBCC) {
+                        adapter.setState(idnOverallBatteryChargeCycle, (stateCCD.val + stateOBCC.val));
+                        adapter.log.debug(fctName + '; overall charging cycle: ' + stateCCD.val + ': daily charging cycle: ' + stateOBCC.val);
+
+                        // reset daily charging cycle
+                        adapter.setState(idnBatteryChargeCycleDaily, 0, true);
+                        mBatteryChargeCycleDaily = 0;
+                    }
+                });
+            }
         }
     });
 
@@ -890,12 +921,24 @@ function dailyAccumulation() {
 
 
 function updateStatus() {
-    adapter.log.debug('updateStatus' + ' started');
+    const fctName = 'updateStatus';
+
+    adapter.log.debug(fctName + ' started');
 
     mobjMower.getStatus(function (error, response, result) {
-        adapter.log.debug('updateStatus' + ' error: ' + JSON.stringify(error));	// null
-//!D!                logs('updateStatus' + ' response: ' + JSON.stringify(response), 'debug2');
-        adapter.log.debug('updateStatus' + ' result: ' + JSON.stringify(result));
+        adapter.log.debug(fctName + ' error: ' + JSON.stringify(error));	// null
+//!D!                logs(fctName + ' response: ' + JSON.stringify(response), 'debug2');
+        adapter.log.debug(fctName + ' result: ' + JSON.stringify(result));
+
+        let sMsg = '',
+        sLastLatitide = '',
+        sLastLongitude = '';
+
+        if(result.lastLocations && result.lastLocations.length > 0) {
+            sLastLatitide = result.lastLocations[0].latitude;
+            sLastLongitude = result.lastLocations[0].longitude;
+        }
+
         result.lastLocations = [];
         // {"batteryPercent":89,"connected":true,"lastErrorCode":0,"lastErrorCodeTimestamp":0,"mowerStatus":"PARKED_AUTOTIMER","nextStartSource":"COMPLETED_CUTTING_TODAY_AUTO","nextStartTimestamp":1524225600,"operatingMode":"AUTO","storedTimestamp":1524158931955,"showAsDisconnected":false,"valueFound":true,"cachedSettingsUUID":"29f71a2b-525d-4c34-9962-0c3aaa0a12d3","lastLocations":null}
 
@@ -929,18 +972,18 @@ function updateStatus() {
 
         if(mLastErrorCode !== result.lastErrorCode) {
             adapter.setState(idnCurrentErrorCode, parseInt(result.lastErrorCode), true);
-            adapter.setState(idnCurrentErrorCodeTS, result.lastErrorCodeTimestamp, true);
+            adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60 * 1000)), true);
 
             if(parseInt(result.lastErrorCode) === 0 && mLastErrorCode > 0) {
                 adapter.setState(idnLastErrorCode, mLastErrorCode, true);
                 adapter.setState(idnLastErrorCodeTS, mLastErrorCodeTimestamp, true);
             }
 
-            var sMsg = 'subscribe mower error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + mUrlGoogleMaps + lat2 + ',' + long2;
+            sMsg = 'subscribe mower error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
             adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
 
             mLastErrorCode = parseInt(result.lastErrorCode);
-            mLastErrorCodeTimestamp = result.lastErrorCodeTimestamp;
+            mLastErrorCodeTimestamp = result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60 * 1000);
         }
 
         adapter.setState(idnLastStatus, mCurrentStatus);
@@ -951,14 +994,14 @@ function updateStatus() {
         adapter.setState(idnMowerConnected, result.connected, true);
 
         adapter.setState(idnNextStartSource, result.nextStartSource, true);
-        adapter.setState(idnNextStartTime, parseInt(result.nextStartTimestamp), true);
+        adapter.setState(idnNextStartTime, parseInt(result.nextStartTimestamp + (mTimeZoneOffset * 60 * 1000)), true);
         adapter.setState(idnOperatingMode, result.operatingMode, true);
 //!P! ???
         if(parseInt(result.batteryPercent) === 100 && result.operatingMode === 'HOME') {
             // manuel start required, start mower
             // !P! ?? adapter.setState(idnAMAction, 1, true);
 
-            adapter.log.warn('updateStatus' + ', result.operatingMode === ' + 'HOME', 'mower (should) started');
+            adapter.log.warn(fctName + ', result.operatingMode === ' + 'HOME', 'mower (should) started');
         }
 
         //adapter.log.info(' mCurrentStatus: ' + mCurrentStatus + ' mLastStatus: ' + mLastStatus + '; mLastErrorCode: ' + mLastErrorCode + '; mCurrentErrorCode: ' + mCurrentErrorCode + '; mCurrentErrorCodeTimestamp: ' + getDateTimeWseconds(mCurrentErrorCodeTimestamp) + '; mBatteryPercent: ' + mBatteryPercent);
@@ -967,10 +1010,10 @@ function updateStatus() {
         //mValueFound: true; mStoredTimestamp: 2018-04-19, 22:00:12; mOperatingMode: AUTO; mConnected: true; mShowAsDisconnected: false
 
         mobjMower.getGeoStatus(function (geo_error, geo_response, geo_result) {
-            adapter.log.debug('updateStatus' + ' geo_error: ' + JSON.stringify(geo_error));	// null
-//!D!                logs('updateStatus' + ' geo_response: ' + JSON.stringify(geo_response), 'debug2');
-            adapter.log.debug('updateStatus' + ' geo_result: ' + JSON.stringify(geo_result));
-            //!D!console.log('updateStatus' + ' geo_result: ' + JSON.stringify(geo_result));
+            adapter.log.debug(fctName + ' geo_error: ' + JSON.stringify(geo_error));	// null
+//!D!                logs(fctName + ' geo_response: ' + JSON.stringify(geo_response), 'debug2');
+            adapter.log.debug(fctName + ' geo_result: ' + JSON.stringify(geo_result));
+            //!D!console.log(fctName + ' geo_result: ' + JSON.stringify(geo_result));
 
             adapter.setState(idnLastHttpStatus, geo_response.statusCode, true);
 
@@ -980,16 +1023,17 @@ function updateStatus() {
                 adapter.setState(idnRawResponseGeo, JSON.stringify(geo_result), true);
             }
 
-            var newDist = 0,
+            let newDist = 0,
                 position,
-                jsonNewPositions = [];
+                jsonNewPositions = [],
+                bFound = false;
 
             // assumption: newest data first, confirmed
             // accumulate positions and mileage beginnig from end if array (oldest positions)
-            adapter.log.debug('updateStatus' + ', geo_result.lastLocations.length:' + geo_result.lastLocations.length);
-            adapter.log.debug('updateStatus' + ', mLastLocationLongi:' + mLastLocationLongi + '; mLastLocationLati:' + mLastLocationLati);
-            for (var i = geo_result.lastLocations.length - 1; i >= 0; i--) {
-                //adapter.log.debug('updateStatus' + ', i:' + i + '; geo_result.lastLocations[i].longitude:' + geo_result.lastLocations[i].longitude + '; geo_result.lastLocations[i].latitude:' + geo_result.lastLocations[i].latitude);
+            adapter.log.debug(fctName + ', geo_result.lastLocations.length:' + geo_result.lastLocations.length);
+            adapter.log.debug(fctName + ', mLastLocationLongi:' + mLastLocationLongi + '; mLastLocationLati:' + mLastLocationLati);
+            for (let i = geo_result.lastLocations.length - 1; i >= 0; i--) {
+                //adapter.log.debug(fctName + ', i:' + i + '; geo_result.lastLocations[i].longitude:' + geo_result.lastLocations[i].longitude + '; geo_result.lastLocations[i].latitude:' + geo_result.lastLocations[i].latitude);
 
                 // set home location data, if not set
                 if(mHomeLocationLongitude === 0 || mHomeLocationLongitude === '' || mHomeLocationLatitude === 0 || mHomeLocationLatitude === '') {
@@ -1000,7 +1044,7 @@ function updateStatus() {
                     adapter.setState(idnHomeLocationLongitude, mHomeLocationLongitude, true);
                 }
                 if(i === geo_result.lastLocations.length - 1) {
-                    // write server position datat
+                    // write server position data on first loop
                     adapter.setState(idnHomeLocationLatitudeCP, geo_result.centralPoint.location.latitude, true);
                     adapter.setState(idnHomeLocationLongitudeCP, geo_result.centralPoint.location.longitude, true);
                     adapter.setState(idnHomeLocationSensitivityLevel, geo_result.centralPoint.sensitivity.level, true);
@@ -1010,34 +1054,41 @@ function updateStatus() {
                 if(geo_result.lastLocations[i].longitude === mLastLocationLongi && geo_result.lastLocations[i].latitude === mLastLocationLati) {
                     // should like the last known position, data has no timestamp
                     // remove older positions and reset new distance
-                    //adapter.log.debug('updateStatus' + ' last position found:' + JSON.stringify(geo_result.lastLocations[i]) + '; i:' + i);
+                    adapter.log.debug(fctName + ' last position found:' + JSON.stringify(geo_result.lastLocations[i]) + '; i:' + i);
 
                     jsonNewPositions = [];
                     newDist = 0;
-
+                    bFound = true;
                 } else {
                     position = { "longitude": geo_result.lastLocations[i].longitude, "latitude": geo_result.lastLocations[i].latitude, "time": result.storedTimestamp};
-                    //adapter.log.debug('updateStatus' + ' position:' + JSON.stringify(position) + '; i:' + i + '; mCurrentStatus:' + mCurrentStatus + '; mLastStatus:' + mLastStatus);
+                    //adapter.log.debug(fctName + ' position:' + JSON.stringify(position) + '; i:' + i + '; mCurrentStatus:' + mCurrentStatus + '; mLastStatus:' + mLastStatus);
 
                     jsonNewPositions.push(position);      // save position
                     //!P! check location; alle Positionen prüfen oder reicht letze Position --> checkAMatHome
                     // if out of frame --> alarm
 
                     // add to distance, without timestams it's not poosible to determine cutting position exactly
-                    if(i < (geo_result.lastLocations.length - 1) && (mCurrentStatus === 'OK_CUTTING' || (mLastStatus === 'OK_CUTTING' && !mCurrentStatus === 'OK_CUTTING'))) { // mileage only, if mower cutting
-                        newDist = newDist + getDistance(geo_result.lastLocations[i + 1].latitude, geo_result.lastLocations[i + 1].longitude, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
-                        //adapter.log.debug('updateStatus' + ' mDist:' + mDist + '; i:' + i);
+                    if(i < (geo_result.lastLocations.length - 1) && ((mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO') || ((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && !(mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO')))) { // mileage only, if mower cutting
+                        if(i === geo_result.lastLocations.length - 1) {
+                            newDist = newDist + getDistance(mLastLocationLati, mLastLocationLongi, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
+                        } else {
+                            newDist = newDist + getDistance(geo_result.lastLocations[i + 1].latitude, geo_result.lastLocations[i + 1].longitude, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
+                        }
+                        if(bFound) adapter.log.debug(fctName + ', i:' + i + '; newDist:' + newDist + '; [i + 1].latitude:' + geo_result.lastLocations[i + 1].latitude + '; [i + 1].longitude:' + geo_result.lastLocations[i + 1].longitude + '; [i].latitude:' + geo_result.lastLocations[i].latitude + '; [i].longitude:' + geo_result.lastLocations[i].longitude);
                     }
                 }
             }
             mJsonLastLocations = mJsonLastLocations.concat(jsonNewPositions);      // add new positions
             mDist = mDist + newDist;
-            adapter.log.debug('updateStatus' + ', add new distance; mDist: ' + mDist + '; newDist: ' + newDist);
+            mDistDaily = mDistDaily + newDist;
+            adapter.log.debug(fctName + ', add new distance; mDist: ' + mDist + '; mDistDaily: ' + mDistDaily + '; newDist: ' + newDist);
 
             // check position in range
             checkAMatHome(geo_result.lastLocations[0].latitude, geo_result.lastLocations[0].longitude);
 
-            adapter.log.debug('updateStatus' + ' idnLastLocations: ' + JSON.stringify(mJsonLastLocations) + '; idnCurrentCoveredDistance: ' + Math.round(mDist, 2));
+            //adapter.log.debug(fctName + '; idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
+            adapter.log.debug(fctName + '; idnCurrentCoveredDistance: ' + Math.round(mDist, 2));
+            adapter.log.debug(fctName + '; idnCoveredDistanceDaily: ' + Math.round(mDistDaily, 2));
             adapter.setState(idnLastLocations, JSON.stringify(mJsonLastLocations), true);
             adapter.setState(idnCurrentCoveredDistance, Math.round(mDist, 2), true);
 
@@ -1052,15 +1103,15 @@ function updateStatus() {
                 adapter.setState(idnLastLocationTimestamp, result.storedTimestamp, true);      // !?
 
                 // Offset
-                if(mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'OFF_DISABLED') {
+                if(mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER' || mCurrentStatus === 'OFF_DISABLED') {
                     adapter.setState(idnHomeLocationLongitudeOffset, geo_result.lastLocations[0].longitude, true);
                     adapter.setState(idnHomeLocationLatitudeOffset, geo_result.lastLocations[0].latitude, true);
                 }
             }
-            adapter.log.debug('updateStatus' + ' geo finished');
+            adapter.log.debug(fctName + ' geo finished');
         }); // mobjMower.getGeoStatus
 
-        adapter.log.debug('updateStatus' + ', mCurrentStatus: ' + mCurrentStatus + '; mCurrentStatus === \'OK_CUTTING\': ' + (mCurrentStatus === 'OK_CUTTING') + '; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime);
+        adapter.log.debug(fctName + ', mCurrentStatus: ' + mCurrentStatus + '; mCurrentStatus === \'OK_CUTTING\': ' + (mCurrentStatus === 'OK_CUTTING') + '; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime);
 
         // !P! wenn Status sich ändert haben wir tc oder? - Wofür?
         if(mCurrentStatus != mLastStatus) {
@@ -1070,7 +1121,7 @@ function updateStatus() {
             adapter.setState(idnLastStatusChangeTime, result.storedTimestamp, true);
         }
 
-        if(mCurrentStatus === 'OK_CUTTING') {
+        if(mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO') {
             // reset start timer after rain, mower is started manually?
             if (mWaitAfterRainTimer !== null) {
                 //!P! clearTimeout(mWaitAfterRainTimer);
@@ -1088,37 +1139,41 @@ function updateStatus() {
                 adapter.setState(idnNextStartWatching, false, true);
             }
 
-            if(mLastStatus !== 'OK_CUTTING' && mStartMowingTime === 0) { // possible after error
+            if(mStartMowingTime === 0) {
                 // start mowing
                 mStartMowingTime = new Date().getTime();
-
-                //!P! ? adapter.setState(idnMowingStartTime, mStartMowingTime, true);
+                adapter.setState(idnMowingStartTime, mStartMowingTime, true);
             }
-            if((mLastStatus === 'OK_CUTTING' || mLastStatus === 'unknown') && mStartMowingTime > 0) {  //  === 0 --> processed in other action like OK_SEARCHING or adapter restarted
+            if(((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') || mLastStatus === 'unknown') && mStartMowingTime > 0) {  //  === 0 --> processed in other action like OK_SEARCHING or adapter restarted
                 // mowing
-                mMowingTime = mMowingTime + ((new Date().getTime() - mStartMowingTime) / (1000 * 60)) % 24;
-                adapter.setState(idnMowingTime, mMowingTime, true);
+                let newMowingTIme = ((new Date().getTime() - mStartMowingTime) / (1000 * 60));
 
-                adapter.log.debug('updateStatus' + ', mower in action; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime);
-
+                mMowingTime += newMowingTIme;
+                mMowingTimeDaily += newMowingTIme;
                 mStartMowingTime = new Date().getTime();
-            }
 
-           if(mStartMowingTime === 0) { // should > 0 on cutting
-               mStartMowingTime = new Date().getTime();
-               adapter.setState(idnMowingStartTime, mStartMowingTime, true);
-           }
+                adapter.setState(idnMowingTime, Math.round(mMowingTime), true);
+                adapter.setState(idnMowingTimeDaily, Math.round(mMowingTimeDaily), true);
+
+                adapter.log.debug(fctName + ', mower in action; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime + '; mMowingTimeDaily: ' + mMowingTimeDaily + '; newMowingTIme: ' + newMowingTIme);
+            }
         }
 
-        if(mCurrentStatus !== 'OK_CUTTING' && mLastStatus === 'OK_CUTTING') {
-            // add mowing time
+        if((mCurrentStatus !== 'OK_CUTTING' && mCurrentStatus !== 'OK_CUTTING_NOT_AUTO') && (mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && mStartMowingTime > 0) {
+            // mowing finished/break/error --> add last mowing time
             // timediff in ms --> min
-            mMowingTime = mMowingTime + ((new Date().getTime() - mStartMowingTime) / (1000 * 60)) % 24;
-            adapter.setState(idnMowingTime, mMowingTime, true);
+            let newMowingTIme = ((new Date().getTime() - mStartMowingTime) / (1000 * 60));
 
-            adapter.log.debug('updateStatus' + ', mowing finished/break; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime);
+            mMowingTime += newMowingTIme;
+            mMowingTimeDaily += newMowingTIme;
 
+            adapter.setState(idnMowingTime, Math.round(mMowingTime), true);
+            adapter.setState(idnMowingTimeDaily, Math.round(mMowingTimeDaily), true);
+
+            adapter.log.debug(fctName + ', mowing finished/break; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime + '; mMowingTimeDaily: ' + mMowingTimeDaily);
             mStartMowingTime = 0;
+            mMowingTime = 0;
+            mDist = 0;
         }
 
         if(mCurrentStatus === 'OK_LEAVING' && mLastStatus !== 'OK_LEAVING' && mStartMowingTime === 0) {
@@ -1127,64 +1182,87 @@ function updateStatus() {
             adapter.setState(idnMowingStartTime, mStartMowingTime, true);
         }
 
-        if((mCurrentStatus === 'OK_SEARCHING' && mLastStatus !== 'OK_SEARCHING' && mSearchingStartTime === 0) || (mCurrentStatus === 'ERROR' && mLastStatus === 'OK_CUTTING')) {
-            if(mCurrentStatus === 'OK_SEARCHING' && mLastStatus !== 'OK_SEARCHING') {
-                // searchtime start
-                mSearchingStartTime = new Date().getTime();
-            }
+        if(mCurrentStatus === 'OK_SEARCHING' && mLastStatus !== 'OK_SEARCHING' && mSearchingStartTime === 0) {
+            // start searching
+            mSearchingStartTime = new Date().getTime();
+            adapter.setState(idnLastDockingTime, mSearchingStartTime, true);
+            adapter.log.debug(fctName + ', start searching; mSearchingStartTime: ' + mSearchingStartTime);
 
-            if(mLastStatus === 'OK_CUTTING' && mStartMowingTime > 0) {
-                // mowing finished, update mowing time
-                mMowingTime = mMowingTime + ((new Date().getTime() - mStartMowingTime) / (1000 * 60)) % 24;
-                adapter.setState(idnMowingTime, mMowingTime, true);
-
-                adapter.log.debug('updateStatus' + ', mower searching; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime);
-
-                mStartMowingTime = 0;
-
-                if(mMowingTimeBatteryNew > 0) {
-                    adapter.setState(idnMowingTimeBatteryCurrent, mMowingTime, true);
-                } else {
-                    // set first mowing time
-                    adapter.setState(idnMowingTimeBatteryNew, mMowingTime, true);
-                }
+            // regular mowing finished, update last mowing time
+            if(mMowingTimeBatteryNew > 0) {
+                mLastMowingTime = mMowingTime;
+                adapter.setState(idnLastMowingTime, Math.round(mLastMowingTime), true);
+            } else {
+                // set first mowing time
+                mMowingTimeBatteryNew = mMowingTime;
+                adapter.setState(idnMowingTimeBatteryNew, Math.round(mMowingTimeBatteryNew), true);
             }
         }
 
         // time too find station
-        if((mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'OK_PARKING') && mSearchingStartTime > 0) {
-            adapter.setState(idnLastStationReturnTime, parseInt((new Date().getTime() - mSearchingStartTime) / (1000 * 60)) % 24, true);
+        if((mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'XXXXXX' || mCurrentStatus === 'XXXXXXX') && mSearchingStartTime > 0) {
+            let searchTime = parseInt((new Date().getTime() - mSearchingStartTime) / (1000 * 60));
+            adapter.setState(idnLastStationReturnTime, searchTime, true);
+            adapter.log.debug(fctName + ', search finshed; mSearchingStartTime: ' + mSearchingStartTime + '; searchTime: ' + searchTime);
 
             mSearchingStartTime = 0;
         }
 
-        if(mCurrentStatus === 'OK_CHARGING' && mLastStatus !== 'OK_CHARGING') {
-            // start charching
-            mCharchingStartTime = new Date().getTime();
-            adapter.setState(idnCharchingStartTime, mCharchingStartTime, true);
+        if(mCurrentStatus === 'OK_CHARGING' && mLastStatus !== 'OK_CHARGING') {     // mLastStatus === 'unknown' or other regular status
+            if(mChargingStartTime === 0 || mChargingStartTime < (new Date().getTime() - mChargingTimeBatteryNew)) { //
+                // start charging
+                mChargingStartTime = new Date().getTime();
+                adapter.setState(idnChargingStartTime, mChargingStartTime, true);
 
-            ++mBatteryChargeCycle;
-            adapter.setState(idnBatteryChargeCycle, mBatteryChargeCycle, true);
-        }
-
-        if(mCurrentStatus !== 'OK_CHARGING' && mLastStatus === 'OK_CHARGING' && mCharchingStartTime > 0) {
-            // charching end
-            if(mCharchingTimeBatteryNew > 0) {
-                mChargingTimeBatteryCurrent = mChargingTimeBatteryCurrent + parseInt((new Date().getTime() - mCharchingStartTime) / (1000 * 60)) % 24
-
-                adapter.setState(idnChargingTimeBatteryCurrent, mChargingTimeBatteryCurrent, true);
-            } else {
-                adapter.setState(idnChargingTimeBatteryNew, parseInt((new Date().getTime() - mCharchingStartTime) / (1000 * 60)) % 24, true);
+                ++mBatteryChargeCycleDaily;
+                adapter.setState(idnBatteryChargeCycleDaily, mBatteryChargeCycleDaily, true);
             }
-            mCharchingStartTime = 0;
-            adapter.setState(idnCharchingStartTime, mCharchingStartTime, true);
+
+            // mLastMowingTime / mMowingTimeBatteryNew --> efficiency factor
+            if(mLastMowingTime > 0 && mMowingTimeBatteryNew > 0) adapter.setState(idnBatteryEfficiencyFactor, Math.round(mLastMowingTime / mMowingTimeBatteryNew * 100, 2), true);
+
+            adapter.log.debug(fctName + ', mower start charging; mChargingStartTime: ' + mChargingStartTime + '; mBatteryChargeCycleDaily: ' + mBatteryChargeCycleDaily + '; mLastMowingTime: ' + mLastMowingTime + '; mMowingTimeBatteryNew: ' + mMowingTimeBatteryNew);
+        }
+        if(mCurrentStatus === 'OK_CHARGING' && mLastStatus === 'OK_CHARGING') {
+            // charging
+            if(mChargingStartTime > 0) {
+                let newChargingTime = parseInt((new Date().getTime() - mChargingStartTime) / (1000 * 60));
+
+                adapter.log.debug(fctName + ', mower charging; newChargingTime: ' + newChargingTime + '; mChargingTimeBatteryCurrent: ' + mChargingTimeBatteryCurrent + '; mChargingTimeBatteryDaily: ' + mChargingTimeBatteryDaily);
+
+                mChargingTimeBatteryCurrent += newChargingTime;
+                mChargingTimeBatteryDaily += newChargingTime;
+                adapter.setState(idnChargingTimeBatteryCurrent, mChargingTimeBatteryCurrent, true);
+                adapter.setState(idnChargingTimeBatteryDaily, mChargingTimeBatteryDaily, true);
+            }
+            mChargingStartTime = new Date().getTime();
+        }
+        if(mCurrentStatus !== 'OK_CHARGING' && mLastStatus === 'OK_CHARGING' && mChargingStartTime > 0) {
+            // charging end
+            adapter.log.debug(fctName + ', mower charging end; mChargingStartTime: ' + mChargingStartTime + '; new Date().getTime(): ' + new Date().getTime() + '; mLastMowingTime: ' + mLastMowingTime + '; mMowingTimeBatteryNew: ' + mMowingTimeBatteryNew);
+//mChargingStartTime: 1526479183267; new Date().getTime(): 1526479484644; mLastMowingTime: 0; mMowingTimeBatteryNew: 703
+
+            let newChargingTime = parseInt((new Date().getTime() - mChargingStartTime) / (1000 * 60));
+
+            mChargingTimeBatteryCurrent += newChargingTime;
+            mChargingTimeBatteryDaily += newChargingTime;
+            adapter.setState(idnChargingTimeBatteryCurrent, mChargingTimeBatteryCurrent, true);
+            adapter.setState(idnChargingTimeBatteryDaily, mChargingTimeBatteryDaily, true);
+            adapter.log.debug(fctName + ', mower charging end; mChargingTimeBatteryCurrent: ' + mChargingTimeBatteryCurrent + '; mChargingTimeBatteryDaily: ' + mChargingTimeBatteryDaily + '; newChargingTime: ' + newChargingTime);
+
+            if(mChargingTimeBatteryNew === 0) {
+                adapter.setState(idnChargingTimeBatteryNew, mChargingTimeBatteryCurrent, true);
+            }
+            mChargingStartTime = 0;
+            mChargingTimeBatteryCurrent = 0;
+            // !P! ??? adapter.setState(idnChargingStartTime, mChargingStartTime, true);
         }
 
-        adapter.log.debug('updateStatus' + ', mBatteryPercent: ' + mBatteryPercent + '; mScheduleStatus: ' + mScheduleStatus + '; mScheduleTime: ' + mScheduleTime + '; adapter.config.pollInactive: ' + adapter.config.pollInactive);
+        adapter.log.debug(fctName + ', mBatteryPercent: ' + mBatteryPercent + '; mScheduleStatus: ' + mScheduleStatus + '; mScheduleTime: ' + mScheduleTime + '; adapter.config.pollInactive: ' + adapter.config.pollInactive);
         if(mCurrentStatus === 'OK_CHARGING' && mBatteryPercent <= 95) {
             // laden
             if(mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== adapter.config.pollInactive)) {
-                mScheduleTime= adapter.config.pollInactive;
+                mScheduleTime = adapter.config.pollInactive;
 
                 createStatusScheduler();
             }
@@ -1198,11 +1276,15 @@ function updateStatus() {
         }
 
         /*
+            PARKED_AUTOTIMER
+            PARKED_PARKED_SELECTED
+            PARKED_TIMER
+
                                             if(mCurrentStatus === 'PARKED_AUTOTIMER' && mWaitAutoTimer === null) {
                                                 // should be started on nextStarttimer --> watch
-                                                var nextStart = adapter.getState(idNextStartTimestamp).val;
+                                                let nextStart = adapter.getState(idNextStartTimestamp).val;
                                                 nextStart = dateAdd(nextStart, - mTimeZoneOffset, 'hours');          // get local time
-                                                var nextStart2 = nextStart - (1000 * 60 * mTimeZoneOffset) ;
+                                                let nextStart2 = nextStart - (1000 * 60 * mTimeZoneOffset) ;
                                                 logs(fctName + '; mCurrentStatus === "PARKED_AUTOTIMER", mWaitAutoTimer' + nextStart + '; nextStart2: ' + nextStart2 + '; current time:' + new Date().getTime(), 'debug2');
 
                                                 if(nextStart - new Date().getTime() > 0) {
@@ -1215,12 +1297,12 @@ function updateStatus() {
                                                 }
                                             }
         */
-        if(mCurrentStatus === 'PARKED_AUTOTIMER') {
-            mTime = mNextStart  - (1000 * 60 * 60 * mTimeZoneOffset) - new Date().getTime();  // !P! !!!! ????
-            adapter.log.debug('updateStatus' + '; mCurrentStatus === "PARKED_AUTOTIMER", miliseconds to next start' + mTime + '; mTimeZoneOffset: ' + mTimeZoneOffset);
+        if(mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER') {
+            let nTime = (mNextStart - new Date().getTime()) / 1000;     // seconds to start mower
+            adapter.log.debug(fctName + '; mCurrentStatus === "' + mCurrentStatus + '", seconds to next start' + nTime);
 
-            if(mStoppedDueRain === true && (mTime - 300 * 1000) < 5) {
-                adapter.log.debug('updateStatus' + '; stop autostart while rain');
+            if(mStoppedDueRain === true && (nTime < parseInt(adapter.config.pollInactive))) {
+                adapter.log.debug(fctName + '; stop autostart while rain');
 
                 mobjMower.sendCommand(mobjMower.command.stop, (err, msg) => {
                     if (err) {
@@ -1236,7 +1318,7 @@ function updateStatus() {
         }
     });
 
-    adapter.log.debug('updateStatus' + ' finhed');
+    adapter.log.debug(fctName + ' finhed');
 
 } // updateStatus()
 
@@ -1248,70 +1330,44 @@ adapter.on('ready', function () {
 });
 
 
-function syncConfig() {
-    adapter.log.debug('syncConfig' + ' started');	// null
+function syncConfig(callback) {
+    const fctName = 'syncConfig';
 
-    if(adapter.config.idTimeZoneOffset !== '') {
-        adapter.getForeignState(adapter.config.idTimeZoneOffset, function (err, state) {
-            if (!err && state) {
-                mTimeZoneOffset = state.val;
-            }
-            adapter.log.debug('syncConfig' + ', adapter.config.idTimeZoneOffset:' + adapter.config.idTimeZoneOffset + '; mTimeZoneOffset:' + mTimeZoneOffset);
-        });
-    }
+    adapter.log.debug(fctName + ' started');
 
     adapter.getState(idnLastLocations, function (err, idState) {
         if (err) {
             adapter.log.error(err);
 
-            return;
+            callback();
         }
 
         // on getStates serveral problems on reading, string too long?
         mJsonLastLocations = JSON.parse(idState.val);
 
-        adapter.log.debug('syncConfig' + ', mJsonLastLocations:' + mJsonLastLocations);
+        adapter.log.debug(fctName + ', mJsonLastLocations:' + mJsonLastLocations);
     });
 
     adapter.getStates('mower.*', function (err, idStates) {
         if (err) {
             adapter.log.error(err);
 
-            return;
+            callback();
         }
 
         // gather states that need to be read
-        adapter.log.debug('syncConfig' + ' idStates: ' + JSON.stringify(idStates));
+        adapter.log.debug(fctName + ' idStates: ' + JSON.stringify(idStates));
 
-        for (var idState in idStates) {
+        for (let idState in idStates) {
             if (!idStates.hasOwnProperty(idState) || idStates[idState] === null) {
                 //if (!idStates.hasOwnProperty(idState)) {
                 continue;
             }
 
-            var iddp = idState.substr(adapter.namespace.length + 1);
-            adapter.log.debug('syncConfig' + ', processing state:' + iddp);
+            let iddp = idState.substr(adapter.namespace.length + 1);
+            adapter.log.debug(fctName + ', processing state:' + iddp);
 
             switch (iddp) {
-                case idnOverallMowingTime:
-                    // check last dayly accumulation
-                    adapter.getState(idnCurrentCoveredDistance, function (err, idStateCCD) {
-                        if (err) {
-                            adapter.log.error(err);
-
-                            return;
-                        }
-
-
-                        if(idStates[idState].ts < new Date().setHours(0, 0, 0, 0) && idStateCCD.val > 0) {
-                            // exec
-                            dailyAccumulation();
-
-                            adapter.log.info('syncConfig' + ', dailyAccumulation started');
-                        }
-                    });
-
-                    break;
                 case idnLastStatus:
                     mLastStatus = idStates[idState].val;
                     break;
@@ -1333,6 +1389,9 @@ function syncConfig() {
                 case idnCurrentCoveredDistance:
                     mDist = JSON.parse(idStates[idState].val);
                     break;
+                case idnCoveredDistanceDaily:
+                    mDistDaily = JSON.parse(idStates[idState].val);
+                    break;
                 case idnLastLocationLongitude:
                     mLastLocationLongi = JSON.parse(idStates[idState].val);
                     break;
@@ -1345,23 +1404,23 @@ function syncConfig() {
                 case idnHomeLocationLatitude:
                     mHomeLocationLatitude = idStates[idState].val;
                     break;
-                case idnHomeLocationMaxDistance:
-                    mMaxDistance = parseInt(idStates[idState].val);
-                    break;
                 case idnBatteryPercent:
                     mBatteryPercent = parseInt(idStates[idState].val);
                     break;
-                case idnBatteryChargeCycle:
-                    mBatteryChargeCycle = parseInt(idStates[idState].val);
+                case idnBatteryChargeCycleDaily:
+                    mBatteryChargeCycleDaily = parseInt(idStates[idState].val);
                     break;
                 case idnMowingStartTime:
                     mStartMowingTime = parseInt(idStates[idState].val);
                     break;
-                case idnMowingTimeBatteryCurrent:
-                    mMowingTimeBatteryCurrent = parseInt(idStates[idState].val);
+                case idnLastMowingTime:
+                    mLastMowingTime = parseInt(idStates[idState].val);
                     break;
-                case idnCharchingStartTime:
-                    mCharchingStartTime = parseInt(idStates[idState].val);
+                case idnMowingTimeBatteryNew:
+                    mMowingTimeBatteryNew = parseInt(idStates[idState].val);
+                    break;
+                case idnChargingStartTime:
+                    mChargingStartTime = parseInt(idStates[idState].val);
                     break;
                 case idnChargingTimeBatteryNew:
                     mChargingTimeBatteryNew = parseInt(idStates[idState].val);
@@ -1369,18 +1428,26 @@ function syncConfig() {
                 case idnChargingTimeBatteryCurrent:
                     mChargingTimeBatteryCurrent = parseInt(idStates[idState].val);
                     break;
+                case idnChargingTimeBatteryDaily:
+                    mChargingTimeBatteryDaily = parseInt(idStates[idState].val);
+                    break;
                 case idnMowingTime:
                     mMowingTime = parseInt(idStates[idState].val);
                     break;
+                case idnMowingTimeDaily:
+                    mMowingTimeDaily = parseInt(idStates[idState].val);
+                    break;
             }
         }
-        adapter.log.debug('syncConfig' + ', idnLastStatus: ' + mLastStatus + ', idnNextStartTime: ' + mNextStart + ', idnStoppedDueRain: ' + mStoppedDueRain + ', idnCurrentErrorCode: ' + mLastErrorCode + ', idTimeZoneOffset: ' + mTimeZoneOffset);
-        adapter.log.debug('syncConfig' + ', idnCurrentCoveredDistance: ' + mDist + ', idnLastLocationLongitude: ' + mLastLocationLongi + ', idnLastLocationLatitude: ' + mLastLocationLati + ', idnHomeLocationLongitude: ' + mHomeLocationLongitude + ', idnHomeLocationLatitude: ' + mHomeLocationLongitude);
-        adapter.log.debug('syncConfig' + ', idnHomeLocationMaxDistance: ' + mMaxDistance + ', idnBatteryPercent: ' + mBatteryPercent + ', idnBatteryChargeCycle: ' + mBatteryChargeCycle + ', idnBatteryChargeCycle: ' + mMowingTime);
-        //adapter.log.debug('syncConfig' + ', idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
+        adapter.log.debug(fctName + ', idnLastStatus: ' + mLastStatus + ', idnNextStartTime: ' + mNextStart + ', idnStoppedDueRain: ' + mStoppedDueRain + ', idnCurrentErrorCode: ' + mLastErrorCode + ', idnCurrentErrorCodeTS: ' + mLastErrorCodeTimestamp);
+        adapter.log.debug(fctName + ', idnCurrentCoveredDistance: ' + mDist + ', idnLastLocationLongitude: ' + mLastLocationLongi + ', idnLastLocationLatitude: ' + mLastLocationLati + ', idnHomeLocationLongitude: ' + mHomeLocationLongitude + ', idnHomeLocationLatitude: ' + mHomeLocationLongitude);
+        adapter.log.debug(fctName + ', idnBatteryPercent: ' + mBatteryPercent + ', idnBatteryChargeCycleDaily: ' + mBatteryChargeCycleDaily + ', idnMowingTime: ' + mMowingTime + ', idnMowingTimeDaily: ' + mMowingTimeDaily);
+        //adapter.log.debug(fctName + ', idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
     });
 
-    adapter.log.debug('syncConfig' + ' finished');
+    adapter.log.debug(fctName + ' finished');
+
+    callback && callback();
 
 } // syncConfig()
 
@@ -1411,7 +1478,7 @@ husqApi.on('mowersListUpdated', (mowers) => {
         adapter.setState(idnMowersJson, JSON.stringify(mowers), true);
 
         if(mowers.length > 1) {
-            var ix = 0;
+            let ix = 0;
             mowers.forEach(function (mower) {
                 if (mower.mower.name === adapter.config.nickname) {
                     mobjMower = mower;
@@ -1450,6 +1517,7 @@ function createSubscriber() {
         adapter.getForeignState(adapter.config.idRainSensor, function (err, idState) {
             if (err) {
                 adapter.log.error(err);
+
                 return;
             }
 
@@ -1460,6 +1528,7 @@ function createSubscriber() {
         adapter.getForeignState(adapter.config.idWeatherRainForecast, function (err, idState) {
             if (err) {
                 adapter.log.error(err);
+
                 return;
             }
 
@@ -1476,10 +1545,10 @@ function createSubscriber() {
 } // createSubscriber()
 
 
-function mover_login() {
+function mower_login() {
     husqApi.logout();
     husqApi.login(adapter.config.email, adapter.config.pwd);
-} // mover_login()
+} // mower_login()
 
 
 function main() {
@@ -1491,9 +1560,6 @@ function main() {
     }
     else {
         createDataStructure();
-
-        //syncConfig();
-        setTimeout(syncConfig, 500);
 
         adapter.log.debug('Mail address: ' + adapter.config.email);
         //adapter.log.debug('Password were set to: ' + adapter.config.pwd);
@@ -1507,18 +1573,31 @@ function main() {
         if (isNaN(mQueryIntervalInactive_s) || mQueryIntervalInactive_s < 300) {
             mQueryIntervalInactive_s = 300;
         }
+        mMaxDistance = adapter.config.homeLocation_maxDistance;
+        if (isNaN(mMaxDistance) || mMaxDistance < 10) {
+            mMaxDistance = 10;
+        }
+        mWaitAfterRain_m = adapter.config.waitAfterRain_m;
+        if (isNaN(mWaitAfterRain_m) || mWaitAfterRain_m < 60) {
+            mWaitAfterRain_m = 60;
+        }
 
-        // !P! hier nicht oder? mScheduleStatus = setInterval(updateStatus, mQueryIntervalActive_s * 1000);
+        syncConfig(function (){
+            dailyAccumulation(true);        // test, if untouched values from yesterday
+
+            mower_login();
+
+            createSubscriber();
+        });
+        //setTimeout(syncConfig, 500);
 
         // subscribe own events
         adapter.subscribeStates('*');
 
-        setTimeout(mover_login, 1000);
+        //setTimeout(mower_login, 1000);
 
-        setTimeout(function() { createSubscriber(); }, 2000);
-
-        // for testing only
-        setTimeout(function() { dailyAccumulation(); }, 4000);
+        //setTimeout(createSubscriber, 2000);
+        adapter.setState(idnHomeLocationMaxDistance, mMaxDistance, true);
     }
 } // main()
 

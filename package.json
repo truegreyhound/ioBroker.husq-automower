@@ -1,6 +1,6 @@
 {
   "name": "iobroker.husq-automower",
-  "version": "0.3.3.0",
+  "version": "1.0.0",
   "description": "Control your Husqvarna Automower with connectmodul",
   "main": "main.js",
   "directories": {},
