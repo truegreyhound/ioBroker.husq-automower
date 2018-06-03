@@ -1,7 +1,7 @@
 gulpfile.js
 *.bak
 tasks
-node_modules
+./node_modules
 .idea
 .git
 .gitignore

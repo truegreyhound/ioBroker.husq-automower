@@ -2,6 +2,7 @@
 ioBroker.husq-automower
 =============
 
+
 [Deutsche Beschreibung hier](README_de.md)
 
 This adapter connects IoBroker with your Husqvarna Automower with Connect-Modul
@@ -31,6 +32,10 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.5
+* (Greyhound) remove dir widgets and www
+* (Greyhound) clean io-package.json, datapoints created on start from adaptercode
+* (Greyhound) add to Travis CI
 #### 0.3.4
 * (Greyhound) new configuration site
 * (Greyhound) correction in accumulate statistic values

@@ -2,7 +2,6 @@
 ioBroker.husq-automower
 =============
 
-
 Dieser Adapter verbindet IoBroker mit deinem Husqvarna Automower mit Connect-Modul
 Es werden Mähzeiten, Akkustand und diverse weitere Daten ausgelesen.
 Einige Grundfunktionen (Start, Stopp, Parken) des Mähers können durch den Adapter gesteuert werden.
@@ -32,7 +31,7 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 #### 0.3.5
 * (Greyhound) remove dir widgets and www
-* (Greyhound) io-package.json, datapoints created on start from adaptercode
+* (Greyhound) clean io-package.json, datapoints created on start from adaptercode
 * (Greyhound) add to Travis CI
 #### 0.3.4
 * (Greyhound) new configuration site
