@@ -31,9 +31,6 @@
     "readme": "https://github.com/truegreyhound/iobroker.husq-automower/blob/master/README.md",
     "loglevel": "info",
     "type": "garden",
-    "restartAdapters": [
-      "vis"
-    ],
     "authors": [
       {
         "name": "truegreyhound",
@@ -41,22 +38,7 @@
       }
     ]
   },
-    "native": {
-        "email": "max.mustermann@gmx.de",
-        "pwd": "PASSWORT",
-        "dev_sel": 0,
-        "enableJson": false,
-        "houerKm": false
-    },
+    "native": {},
     "objects": [],
-    "instanceObjects": [
-      {
-        "_id": "info",
-        "type": "channel",
-        "common": {
-          "name": "information"
-        },
-        "native": {}
-      }
-    ]
+    "instanceObjects": []
 }

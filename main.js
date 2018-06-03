@@ -944,6 +944,7 @@ function updateStatus() {
 
     adapter.log.debug(fctName + ' started');
 
+    // timestamps in seconds
     mobjMower.getStatus(function (error, response, result) {
         adapter.log.debug(fctName + ' error: ' + JSON.stringify(error));	// null
 //!D!                adapter.log.debug(fctName + ' response: ' + JSON.stringify(response), 'debug2');
@@ -991,7 +992,7 @@ function updateStatus() {
 
         if (mLastErrorCode !== result.lastErrorCode) {
             adapter.setState(idnCurrentErrorCode, parseInt(result.lastErrorCode), true);
-            adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp > 0) ? (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60 * 1000)) : result.lastErrorCodeTimestamp, true);
+            adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp > 0) ? (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60)) : result.lastErrorCodeTimestamp, true);
 
             if (parseInt(result.lastErrorCode) === 0 && mLastErrorCode > 0) {
                 adapter.setState(idnLastErrorCode, mLastErrorCode, true);
@@ -1002,7 +1003,7 @@ function updateStatus() {
             adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
 
             mLastErrorCode = parseInt(result.lastErrorCode);
-            mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60 * 1000) : result.lastErrorCodeTimestamp;
+            mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
         }
 
         adapter.setState(idnLastStatus, mCurrentStatus);
@@ -1015,7 +1016,7 @@ function updateStatus() {
         adapter.log.debug(fctName + ', idnNextStartSource: ' + idnNextStartSource + ', nextStartTimestamp: ' + result.nextStartTimestamp + ', mTimeZoneOffset: ' + mTimeZoneOffset);
         adapter.setState(idnNextStartSource, result.nextStartSource, true);
         adapter.setState(idnOperatingMode, result.operatingMode, true);
-        adapter.setState(idnNextStartTime,(result.nextStartTimestamp > 0) ? parseInt(result.nextStartTimestamp + (mTimeZoneOffset * 60 * 1000)) : result.nextStartTimestamp, true);
+        adapter.setState(idnNextStartTime,(result.nextStartTimestamp > 0) ? parseInt((result.nextStartTimestamp + (mTimeZoneOffset * 60)) * 1000) : result.nextStartTimestamp, true);
 
 //!P! ???
         if (parseInt(result.batteryPercent) === 100 && result.operatingMode === 'HOME') {

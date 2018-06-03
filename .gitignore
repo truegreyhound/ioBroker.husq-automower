@@ -1,1 +1,5 @@
-/node_modules
+.gitignore
+.npmignore
+*.bak
+
+./node_modules

@@ -30,6 +30,10 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 ## Changelog
 
+#### 0.3.5
+* (Greyhound) remove dir widgets and www
+* (Greyhound) io-package.json, datapoints created on start from adaptercode
+* (Greyhound) add to Travis CI
 #### 0.3.4
 * (Greyhound) new configuration site
 * (Greyhound) correction in accumulate statistic values
