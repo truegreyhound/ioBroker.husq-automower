@@ -32,6 +32,8 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.6
+* (Greyhound) change header files in index.html for admin v2
 #### 0.3.5
 * (Greyhound) remove dir widgets and www
 * (Greyhound) clean io-package.json, datapoints created on start from adaptercode

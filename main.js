@@ -13,7 +13,7 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 0.3.4.0
+//!V! 0.3.6.0
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
 //!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat

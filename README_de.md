@@ -29,6 +29,8 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 ## Changelog
 
+#### 0.3.6
+* (Greyhound) change header files in index.html for admin v2
 #### 0.3.5
 * (Greyhound) remove dir widgets and www
 * (Greyhound) clean io-package.json, datapoints created on start from adaptercode
