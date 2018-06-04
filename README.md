@@ -2,6 +2,9 @@
 ioBroker.husq-automower
 =============
 
+[![NPM](https://www.npmjs.com/package/iobroker.husq-automower.png?downloads=true)](https://www.npmjs.com/package/iobroker.husq-automower/)
+
+**Tests:** Linux/Mac: [![Travis-CI](https://travis-ci.org/truegreyhound/ioBroker.husq-automower.svg?branch=master)](https://travis-ci.org/truegreyhound/ioBroker.husq-automower)
 
 [Deutsche Beschreibung hier](README_de.md)
 
@@ -32,6 +35,9 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.7
+* (Greyhound) mower nickname in mower.sendMessage
+* (Greyhound) translations complete
 #### 0.3.6
 * (Greyhound) change header files in index.html for admin v2
 #### 0.3.5

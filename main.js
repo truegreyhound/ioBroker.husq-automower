@@ -13,7 +13,7 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 0.3.6.0
+//!V! 0.3.7.0
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
 //!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat
@@ -468,7 +468,7 @@ function createDPs() {
     createState(idnOperatingMode, 'unkonwn');
     createState(idnStopOnRainEnabled, false);
     createState(idnStoppedDueRain, false, idnStoppedDueRain, true);
-    createState(idnTimerAfterRainStartAt, 0);
+    createState(idnTimerAfterRainStartAt, 0, idnTimerAfterRainStartAt, true);
     createState(idnWaitAfterRain, 0, idnWaitAfterRain, false, "min.");
     createState(idnSendMessage, '');
     createState(idnScheduleTime, 0, idnScheduleTime, false, "s");
@@ -545,7 +545,7 @@ function handleMowerOnRain(isRaining) {
                 adapter.setState(idnTimerAfterRainStartAt, 0, true);
             }
 
-            sMsg = fctName + ' to rain; send mower command "park"';
+            sMsg = fctName + ' to rain; send mower ' + mobjMower.mower.name + ' command "park"';
             adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName, isRaining, 1, 'Tg,EL']), true);
         //}
     }
@@ -565,7 +565,7 @@ function handleMowerOnRain(isRaining) {
 
         adapter.setState(idnTimerAfterRainStartAt, new Date().getTime(), true);
 
-        sMsg = fctName + ' to no rain; wait ' + mWaitAfterRain_m + ' min. for starting mower';
+        sMsg = fctName + ' to no rain; wait ' + mWaitAfterRain_m + ' min. for starting mower ' + mobjMower.mower.name ;
         adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' changed', isRaining, 1, 'Tg,EL']), true);
     }
 
@@ -769,7 +769,7 @@ function checkAMatHome(lat2, long2) {
         // alarm
         adapter.log.error(fctName + ' dist > mMaxDistance: ' + dist - mMaxDistance);
 
-        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
+        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower ' + mobjMower.mower.name + ' state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
     }
 
     adapter.log.debug(fctName + ' finished; dist: ' + dist);
@@ -999,8 +999,8 @@ function updateStatus() {
                 adapter.setState(idnLastErrorCodeTS, mLastErrorCodeTimestamp, true);
             }
 
-            sMsg = 'subscribe mower error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
+            sMsg = 'subscribe mower ' + mobjMower.mower.name + ' error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower ' + mobjMower.mower.name + ' error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
 
             mLastErrorCode = parseInt(result.lastErrorCode);
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
@@ -1151,8 +1151,8 @@ function updateStatus() {
 
         // !P! wenn Status sich ändert haben wir tc oder? - Wofür?
         if (mCurrentStatus != mLastStatus) {
-            sMsg = 'updateStatus, mower state changed, from "' + mLastStatus + '" to "' + mCurrentStatus + '"';
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower state changed', mCurrentStatus, 1, 'Tg,EL']), true);
+            sMsg = 'updateStatus, mower ' + mobjMower.mower.name + ' state changed, from "' + mLastStatus + '" to "' + mCurrentStatus + '"';
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' state changed', mCurrentStatus, 1, 'Tg,EL']), true);
 
             adapter.setState(idnLastStatusChangeTime, result.storedTimestamp, true);
         }
@@ -1338,8 +1338,8 @@ function updateStatus() {
 
                                                     setState(idNextStartWatching, true);
 
-                                                    sMsg = 'mower state changed, next autostart on "' + formatDate(nextStart, "JJJJ.MM.TT SS:mm:ss") + '"';
-                                                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower error state changed', nextStart - new Date().getTime() + 60000, 1, 'Tg,EL']), true);
+                                                    sMsg = 'mower ' + mobjMower.mower.name + ' state changed, next autostart on "' + formatDate(nextStart, "JJJJ.MM.TT SS:mm:ss") + '"';
+                                                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower ' + mobjMower.mower.name + ' error state changed', nextStart - new Date().getTime() + 60000, 1, 'Tg,EL']), true);
                                                 }
                                             }
         */
@@ -1358,8 +1358,8 @@ function updateStatus() {
                     }
                 });
 
-                sMsg = 'mower stop send while rain state is true';
-                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower stop send', '', 1, 'Tg,EL']), true);
+                sMsg = 'mower ' + mobjMower.mower.name + ' stop send while rain state is true';
+                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' stop send', '', 1, 'Tg,EL']), true);
             }
         }
     });

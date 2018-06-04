@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "husq-automower",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "news": {
       "1.0.0": {
         "en": "Initial",

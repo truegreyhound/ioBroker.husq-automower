@@ -1,17 +1,24 @@
 <html>
-<meta charset="UTF-8">
-<head>
     <!-- these 4 files always have to be included -->
     <link rel="stylesheet" type="text/css" href="../../lib/css/themes/jquery-ui/redmond/jquery-ui.min.css"/>
     <script type="text/javascript" src="../../lib/js/jquery-1.11.1.min.js"></script>
     <script type="text/javascript" src="../../socket.io/socket.io.js"></script>
     <script type="text/javascript" src="../../lib/js/jquery-ui-1.10.3.full.min.js"></script>
 
-    <!-- these three files  have to be always included -->
+    <!-- these two file always have to be included -->
     <link rel="stylesheet" type="text/css" href="../../css/adapter.css"/>
     <script type="text/javascript" src="../../js/translate.js"></script>
     <script type="text/javascript" src="../../js/adapter-settings.js"></script>
-    <script type="text/javascript" src="words.js"></script>
+
+    <style>
+        .m .col .select-wrapper + label {
+            top: -26px;
+        }
+
+        .m span {
+            font-size: 0.9em;
+        }
+    </style>
 
     <script type="text/javascript">
         var onChange = null;
@@ -34,7 +41,6 @@
         }
 
         function init() {
-            $('#test').button().click(test);
         }
 
         function setValue(id, value) {
@@ -100,37 +106,6 @@
             });
         }
 
-        function test() {
-            if (!isAlive) {
-                showMessage(_('Enable first the adapter to test email.'));
-                return;
-            }
-            var transportOptionsService = $('#transportOptions_service').val();
-
-            sendTo('email.' + instance, 'send', {
-                subject: $('#defaults_subject').val(),
-                to: $('#defaults_to').val(),
-                from: $('#defaults_from').val(),
-                text: _('This is test email!'),
-                options: {
-                    host: transportOptionsService ? undefined : $('#transportOptions_host').val(),
-                    port: transportOptionsService ? undefined : $('#transportOptions_port').val(),
-                    secure: transportOptionsService ? undefined : $('#transportOptions_secure').prop('checked'),
-                    auth: {
-                        user: $('#transportOptions_auth_user').val(),
-                        pass: $('#transportOptions_auth_pass').val()
-                    },
-                    service: transportOptionsService
-                }
-            }, function (result) {
-                if (result.error) {
-                    showMessage(_('Error: ') + result.error);
-                } else {
-                    showMessage(_('Check the log or your email'));
-                }
-            });
-        }
-
         function saveHelper(obj, id, value) {
             var ids = id.split('_');
             if (ids.length === 1) {
@@ -169,9 +144,8 @@
             callback(getSettings());
         }
     </script>
-</head>
 
-<body>
+
 <div id="adapter-container">
 
     <table>
@@ -255,7 +229,7 @@
                 <label class="translate" for="homeLocation_maxDistance">max distance from base (m):</label>
             </td>
             <td>
-                <input id="homeLocation_maxDistance" type="text" size="2" class="value" value="80"/>
+                <input id="homeLocation_maxDistance" type="number" size="2" class="value" value="80"/>
             </td>
             <td></td>
         </tr>
@@ -271,7 +245,7 @@
                 <label class="translate" for="pollActive">query intervall mower active (s):</label>
             </td>
             <td>
-                <input id="pollActive" type="text" size="2" class="value" value="61"/>
+                <input id="pollActive" type="number" size="2" class="value" value="61"/>
             </td>
             <td></td>
         </tr>
@@ -280,7 +254,7 @@
                 <label class="translate" for="pollInactive">query intervall mower inactive (s):</label>
             </td>
             <td>
-                <input id="pollInactive" type="text" size="2" class="value" value="301"/>
+                <input id="pollInactive" type="number" size="2" class="value" value="301"/>
             </td>
             <td></td>
         </tr>
@@ -349,7 +323,7 @@
                 <label class="translate" for="waitAfterRain_m">waittime after rain (min):</label>
             </td>
             <td>
-                <input id="waitAfterRain_m" type="text" size="3" class="value" value="180"/>
+                <input id="waitAfterRain_m" type="number" size="3" class="value" value="180"/>
             </td>
             <td></td>
         </tr>
@@ -360,5 +334,4 @@
     </table>
 
 </div>
-</body>
 </html>
