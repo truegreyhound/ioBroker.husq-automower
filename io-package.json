@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "husq-automower",
-    "version": "0.3.7",
+    "version": "0.3.8",
     "news": {
       "1.0.0": {
         "en": "Initial",
@@ -38,7 +38,10 @@
       }
     ]
   },
-    "native": {},
+  "native": {
+    "email": "",
+    "pwd": ""
+  },
     "objects": [],
     "instanceObjects": []
 }

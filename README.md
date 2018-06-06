@@ -5,6 +5,7 @@ ioBroker.husq-automower
 [![NPM](https://www.npmjs.com/package/iobroker.husq-automower.png?downloads=true)](https://www.npmjs.com/package/iobroker.husq-automower/)
 
 **Tests:** Linux/Mac: [![Travis-CI](https://travis-ci.org/truegreyhound/ioBroker.husq-automower.svg?branch=master)](https://travis-ci.org/truegreyhound/ioBroker.husq-automower)
+Windows: [![AppVeyor](https://ci.appveyor.com/project/truegreyhound/iobroker-husq-automower?branch=master&svg=true)](https://ci.appveyor.com/project/truegreyhound/iobroker-husq-automower/)
 
 [Deutsche Beschreibung hier](README_de.md)
 
@@ -35,6 +36,9 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.8
+* (Greyhound) fix problem with configuration off new instance
+* (Greyhound) add testing with appveyor
 #### 0.3.7
 * (Greyhound) mower nickname in mower.sendMessage
 * (Greyhound) translations complete

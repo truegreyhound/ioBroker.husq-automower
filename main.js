@@ -1389,7 +1389,7 @@ function syncConfig(callback) {
         }
 
         // on getStates serveral problems on reading, string too long?
-        mJsonLastLocations = JSON.parse(idState.val);
+        if(idState !== null && idState.val !== '') mJsonLastLocations = JSON.parse(idState.val);
 
         adapter.log.debug(fctName + ', mJsonLastLocations:' + mJsonLastLocations);
     });
