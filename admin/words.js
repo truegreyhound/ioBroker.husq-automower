@@ -91,7 +91,7 @@ systemDictionary = {
         "pl": "przezwisko"
     },
 
-    "location name:": {
+    "location_name:": {
         "en": "location name:",
         "de": "Standortnamen:",
         "ru": "название местоположения:",
@@ -137,6 +137,18 @@ systemDictionary = {
         "it": "query intervall falciatrice inattiva (s)",
         "es": "consulta intervall segadora inactiva (s)",
         "pl": "Krosownica Intervall nie działa (s)"
+    },
+
+    "alarm if battery charge lether then:": {
+        "en": "alarm if battery charge lether then:",
+        "de": "Alarm wenn Akku Ladung unter:",
+        "ru": "если батарея заряжается, тогда:",
+        "pt": "alarme se carga da bateria deixar então:",
+        "nl": "alarm als de batterij wordt opgeladen dan:",
+        "fr": "alarme si la charge de la batterie lether alors:",
+        "it": "allarme se il lether della batteria allora:",
+        "es": "alarma si la batería está cargada, entonces:",
+        "pl": "alarm, jeśli naładowanie baterii będzie wtedy:"
     },
 
     "save raw data:": {

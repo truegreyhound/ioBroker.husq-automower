@@ -34,6 +34,11 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 ## Changelog
 
+#### 0.3.9
+* (Greyhound) complete configuration fields in io-package.json
+* (Greyhound) add message, if mower base disconnected or mower lifted
+* (Greyhound) new limit for batterycharge for mower.sendMessage
+* (Greyhound) correct small errors in translation configuration
 #### 0.3.8
 * (Greyhound) fix problem with configuration off new instance
 * (Greyhound) add testing with appveyor

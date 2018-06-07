@@ -13,23 +13,19 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 0.3.7.0
+//!V! 0.3.9.0
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
 //!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat
 
 
-//!P! Wenn husq-automower.1.info.connected === false --> Alarm --> Stromausfall, gekappt oder geklaut
+//!P! updateStatus prüfen, dass Status etc. aktualisiert wird, wenn nicht bzw. http-Fehler oder sich trotz CUTTING GPS-Daten nicht ändern --> ALARM
+//!P! - Status Timespamp muss sich ändern (keine Ahnung ob von Husqvarna gesetzt oder nur aktuell vom Webserver)
+//!P! - http-Fehler zählen, Konfigurationsfeld, nach wievielen hintereinander Alarm, log.error
+//!P! - d.h. == 0 oder > 50 oder?
 
-//!P! Mäher angehoben (Code 71) --> Alarm-Message
-
-//!P! via einem Scheduler (setInterval) prüfen, dass Status etc. aktualisiert wird, wenn nicht bzw. http-Fehler oder sich trotz CUTTING GPS-Daten nicht ändern --> ALARM
-
-//!P! Batteriekapazität überwachen, wenn unter xx (10% ?) sinkt, Alarm per telegramm
 
 //!P! in config button to test connection data and fill Combobox to select a mower, on one, fill direct
-
-//!P! dpAutoTimerWatch anzeigen
 
 //!P! kurz vor Autostart mower (wie auslesen, sonst manuell eintragen) prüfen ob Regen, wenn ja, dann mower stop
 
@@ -221,6 +217,7 @@ let mobjMower = [],
     mLastLocationLongi = 0,
     mLastLocationLati = 0,
     mBatteryPercent = 0,
+    mAlarmOnBatteryPercent = false,
     mMowingTime = 0,
     mLastMowingTime = 0,
     mMowingTimeDaily = 0,
@@ -700,9 +697,19 @@ adapter.on('stateChange', function (id, state) {
 
             case idnStoppedDueRain:
                 fctName = 'subscrition StoppedDueRain changed';
-                adapter.log.debug(fctName + ',  id: "' + idnStoppedDueRain + '"; state.val: ' + state.val+ '; adapter.config.stopOnRainEnabled: ' + adapter.config.stopOnRainEnabled);
+                adapter.log.debug(fctName + ',  id: "' + idnStoppedDueRain + '"; state.val: ' + state.val + '; adapter.config.stopOnRainEnabled: ' + adapter.config.stopOnRainEnabled);
 
                 handleMowerOnRain(state.val);
+
+                break;
+            case idnMowerConnected:
+                fctName = 'subscrition mower base connected changed';
+                adapter.log.debug(fctName + ',  id: "' + idnMowerConnected + '"; state.val: ' + state.val);
+
+                if(state.val === false) {
+                    const sMsg = fctName + ' for mower ' + mobjMower.mower.name + ' to FALSE';
+                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' for mower ' + mobjMower.mower.name , false, 1, 'Tg,EL']), true);
+                }
 
                 break;
         }
@@ -994,13 +1001,18 @@ function updateStatus() {
             adapter.setState(idnCurrentErrorCode, parseInt(result.lastErrorCode), true);
             adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp > 0) ? (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60)) : result.lastErrorCodeTimestamp, true);
 
+            if(parseInt(result.lastErrorCode) === 71) {
+                // mower lifted
+                const sMsg = fctName + ' alarm for mower ' + mobjMower.mower.name + ' mower lifted, errorcode 71';
+                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'alarm for mower ' + mobjMower.mower.name, false, 1, 'Tg,EL']), true);
+            }
             if (parseInt(result.lastErrorCode) === 0 && mLastErrorCode > 0) {
                 adapter.setState(idnLastErrorCode, mLastErrorCode, true);
                 adapter.setState(idnLastErrorCodeTS, mLastErrorCodeTimestamp, true);
             }
 
-            sMsg = 'subscribe mower ' + mobjMower.mower.name + ' error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower ' + mobjMower.mower.name + ' error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
+            const sMsg = fctName + ' mower ' + mobjMower.mower.name + ' error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
 
             mLastErrorCode = parseInt(result.lastErrorCode);
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
@@ -1024,6 +1036,17 @@ function updateStatus() {
             // !P! ?? adapter.setState(idnAMAction, 1, true);
 
             adapter.log.warn(fctName + ', result.operatingMode === ' + 'HOME', 'mower (should) started');
+        }
+
+        if (mCurrentStatus !== 'OK_CHARGING' && parseInt(result.batteryPercent) < adapter.config.alarmOnBatteryPercent && mAlarmOnBatteryPercent === false) {
+            mAlarmOnBatteryPercent = true
+
+            const sMsg = fctName + ' mower ' + mobjMower.mower.name + ' battery charge too low: ' + result.batteryPercent;
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' mower ' + mobjMower.mower.name + ' battery charge too low!', result.batteryPercent, 1, 'Tg,EL']), true);
+        }
+        if(parseInt(result.batteryPercent) >= adapter.config.alarmOnBatteryPercent) {
+            // reset alarm
+            mAlarmOnBatteryPercent = false
         }
 
         //adapter.log.info(' mCurrentStatus: ' + mCurrentStatus + ' mLastStatus: ' + mLastStatus + '; mLastErrorCode: ' + mLastErrorCode + '; mCurrentErrorCode: ' + mCurrentErrorCode + '; mCurrentErrorCodeTimestamp: ' + getDateTimeWseconds(mCurrentErrorCodeTimestamp) + '; mBatteryPercent: ' + mBatteryPercent);
