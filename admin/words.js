@@ -213,7 +213,7 @@ systemDictionary = {
 
     "waittime after rain (min):": {
         "en": "waittime after rain (min):",
-        "de": "Wartezeit nach Regen (min):",
+        "de": "Wartezeit nach Regen (min.):",
         "ru": "после дождя (min):",
         "pt": "waittime depois da chuva (min):",
         "nl": "waittime na regen (min):",

@@ -36,6 +36,12 @@ At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 0.3.10
+* (Greyhound) load rain sensor state on start
+* (Greyhound) fix status detecion (no CHARGING state with beginning 12.06.2018 ?)
+* (Greyhound) new datapoint mower.rawResponse_mowers
+* (Greyhound) fix variablen naming for adapter.config (no '_')
+* (Greyhound) changed rain actions, currently only park mower if rain detected, no automatic start if dry
 #### 0.3.9
 * (Greyhound) complete configuration fields in io-package.json
 * (Greyhound) add message, if mower base disconnected or mower lifted

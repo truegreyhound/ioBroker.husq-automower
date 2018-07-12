@@ -1,7 +1,7 @@
 {
   "common": {
     "name": "husq-automower",
-    "version": "0.3.9",
+    "version": "0.3.10",
     "news": {
       "1.0.0": {
         "en": "Initial",
@@ -42,8 +42,8 @@
     "email": "",
     "pwd": "",
     "nickname": "",
-    "homeLocation_name": "",
-    "homeLocation_maxDistance": "",
+    "homeLocationName": "",
+    "homeLocationMaxDistance": "",
     "pollActive": "",
     "pollInactive": "",
     "alarmOnBatteryPercent": "",
@@ -52,7 +52,7 @@
     "idRainSensor": "",
     "rainSensorValue": "",
     "stopOnRainEnabled": "",
-    "waitAfterRain_m": ""
+    "waitAfterRain": ""
   },
     "objects": [],
     "instanceObjects": []

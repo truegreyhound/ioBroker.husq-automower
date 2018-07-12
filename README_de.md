@@ -34,6 +34,12 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 ## Changelog
 
+#### 0.3.10
+* (Greyhound) Status des Regensensors wird beim Adapterstart eingelesen
+* (Greyhound) fix geänderte Statuserkennung (CHARGING wird seit 12.06.2018 nicht mehr gesetzt)
+* (Greyhound) neuer Datenpunkt mower.rawResponse_mowers mit den ausgelesenen Werten bei Anmeldung an Webserver
+* (Greyhound) fix Variablennaming for adapter.config (no '_')
+* (Greyhound) bei Erkennung Regen wird Mäher bis auf weiteres geparkt, es erfolgt kein automatischer Start wenn trocken
 #### 0.3.9
 * (Greyhound) complete configuration fields in io-package.json
 * (Greyhound) add message, if mower base disconnected or mower lifted
