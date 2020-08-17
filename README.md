@@ -28,13 +28,16 @@ Over the action state "husq-automower.x.mower.action" you can do following actio
 
 
 ## installation
-At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
+At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
 
 ## settings
 - to connect to the mower, type in email and password from your Husqvarna account in the config.
-- max. distance from base, if exceeded (value > 0), adapter write message to mover.sendMessage
+- max. distance from base, if exceeded (value > 0), adapter write message to mower.sendMessage
 
 ## Changelog
+
+#### 0.3.14
+* (Greyhound) 
 
 #### 0.3.10
 * (Greyhound) load rain sensor state on start

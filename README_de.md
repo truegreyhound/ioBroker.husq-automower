@@ -29,7 +29,7 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 
 ## Einstellungen
 - Bei E-mail und Passwort müssen die Daten eingeben werden, mit denen man bei Husqvarna registriert und der Mower verbunden ist.
-- max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mover.sendMessage
+- max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mower.sendMessage
 
 
 ## Changelog
