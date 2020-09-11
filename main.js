@@ -206,6 +206,7 @@ const idnMowerConnected = 'info.connected',
     idnLastHttpStatus = 'mower.lastHttpStatus',
     idnLastLocations = 'mower.lastLocations',
     idnLastStatus = 'mower.lastStatus',
+    idnLastStatusId = 'mower.lastStatusId',
     idnLastStatusTime = 'mower.lastStatusTime',
     idnLastStatusChangeTime = 'mower.lastStatusChangeTime',
     idnLastDayLocations = 'mower.lastdayLocations',
@@ -485,6 +486,7 @@ function createDPs() {
     createState(idnLastHttpStatus, 0);
     createState(idnLastLocations, '[]');
     createState(idnLastStatus, 'unkonwn');
+    createState(idnLastStatusId, 0');
     createState(idnLastStatusTime, 0);
     createState(idnLastStatusChangeTime, 0);
     createState(idnLastDayLocations, '[]');
@@ -1083,7 +1085,8 @@ function updateStatus() {
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
         }
 
-        adapter.setState(idnLastStatus, statusMapping[mCurrentStatus]);
+        adapter.setState(idnLastStatus, mCurrentStatus);
+        adapter.setState(idnLastStatusId, statusMapping[mCurrentStatus]);
         adapter.setState(idnLastStatusTime, parseInt(result.storedTimestamp));
 
         adapter.setState(idnBatteryPercent, parseInt(result.batteryPercent), true);
