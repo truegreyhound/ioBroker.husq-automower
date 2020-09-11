@@ -124,6 +124,21 @@ OperatingMode
 
 */
 
+const statusMapping = {
+  'OFF_HATCH_OPEN': 0,
+  'OFF_HATCH_CLOSED_DISABLED': 1,
+  'OK_CHARGING': 2,
+  'OK_CUTTING': 3,
+  'OK_CUTTING_NOT_AUTO': 4,
+  'OK_LEAVING': 5,
+  'OK_SEARCHING': 6,
+  'PARKED_AUTOTIMER': 7,
+  'OFF_DISABLED': 8,
+  'ERROR': 9,
+  'PARKED_PARKED_SELECTED': 10,
+  'PARKED_TIMER': 11,
+  'PAUSED': 12,
+}
 
 // you have to require the utils module and call adapter function
 const utils = require(__dirname + '/lib/utils'); // Get common adapter utils
@@ -1068,7 +1083,7 @@ function updateStatus() {
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
         }
 
-        adapter.setState(idnLastStatus, mCurrentStatus);
+        adapter.setState(idnLastStatus, statusMapping[mCurrentStatus]);
         adapter.setState(idnLastStatusTime, parseInt(result.storedTimestamp));
 
         adapter.setState(idnBatteryPercent, parseInt(result.batteryPercent), true);
