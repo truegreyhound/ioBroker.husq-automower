@@ -486,7 +486,7 @@ function createDPs() {
     createState(idnLastHttpStatus, 0);
     createState(idnLastLocations, '[]');
     createState(idnLastStatus, 'unkonwn');
-    createState(idnLastStatusId, 0');
+    createState(idnLastStatusId, 0);
     createState(idnLastStatusTime, 0);
     createState(idnLastStatusChangeTime, 0);
     createState(idnLastDayLocations, '[]');
