@@ -13,10 +13,17 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 0.3.10.0
+//!V! 0.3.12.0
+
+//!P! Beim daily-Lauf eine Kopie aller Datenpunkte erstellen und im Dateisystem speichern
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
 //!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat
+
+//!P! Zähler für Anzahl WebRequests je Tag einbauen
+//!P! Wenn mobjMower kein valides Objekt, dann das nicht als Statusaltualisierung werten, sondern als Fehler in WebRequest, neuer DP?
+
+
 
 //!P! Option in Cfg für automatischen Neustart nach Regen
 //!P! Option in Cfg für Aktion bei Regen --> park bis auf weiters | Start mit nächster Timereinstellung | parken für 3, 6 oder 12h
@@ -25,6 +32,8 @@
 
 //!P! auf Handy-App gibt es einen Befehl "Pause", dieser bewirkt das Stehenbleiben, sprich pausieren für unbestimmte Zeit oder gibt es weitere Optionen analog zu parken?
 //!P! Wenn Mower in Status Pause wechselt, prüfen, ob in Ladestation (GPS + Abweichung, Druckschalter (in Arbeit), ???), Wenn nicht, dann Telegram-Nachricht und nach Zeit XXX automatisch parken lassen ?!
+
+//!P! Prüfen. wenn Adapter neu gestartet wird, ob einige Werte falsch hochgezählt werden, z. B. Batterieladung Anzahl
 
 /* !P!
 nächster Start / Quelle:	2018.07.11 12:00:00	COMPLETED_CUTTING
@@ -69,12 +78,47 @@ kein nächster Start == manuell?
 //!P! - Blinkt bei Störung, Scheinwerfer ein/aus
 
 /*
+"model": "H" ==? 450X
+"command": {
+			"park": "PARK",
+			"stop": "STOP",
+			"start": "START"
+		},
+		"status": {
+			"error": "ERROR",
+			"cutting": "OK_CUTTING",
+			"manualCutting": "OK_CUTTING_NOT_AUTO",
+			"parked": "PARKED_TIMER",
+			"manualParked": "PARKED_PARKED_SELECTED",
+			"paused": "PAUSED",
+			"searching": "OK_SEARCHING"
+		},
+
+"model": "L" ==?  315X
+		"command": {
+			"park": "PARK",
+			"stop": "STOP",
+			"start": "START"
+		},
+		"status": {
+			"error": "ERROR",
+			"cutting": "OK_CUTTING",
+			"manualCutting": "OK_CUTTING_NOT_AUTO",
+			"parked": "PARKED_TIMER",
+			"manualParked": "PARKED_PARKED_SELECTED",
+			"paused": "PAUSED",
+			"searching": "OK_SEARCHING"
+		},
+*/
+
+/*
 Handy-App
 - sollte Mähdauer anzeigen und wahrscheinlichen nächsten Boxenstop
 - letzte Datenaktualisierung
 - Akkustatus (% Kapazität) beim Mähen anzeigen, wird seit 2018 angezeigt
 - bei bestimmten Fehlern (hängt fest), sollte ein Start per App möglich sein
 - Mäher hatte Netzverbindung verloren, via App nicht erkennbar, es fehlt Datum/Uhrzeit letzte Aktualisierung vom Mäher
+- Datum/Uhrzeit == lokale Zeit ???
 - Rückmeldung Mähen erforderlich (Mähwiderstand)
 - Rückmeldung aktiver Mähbereich
 - bei Statusänderung sollte der Auslöser "festgehalten" werden: mower timer, App + account, via Web-API + account
@@ -106,8 +150,11 @@ Status
 - PAUSED
 
 ErrorCodes
+ 1 - außerhalb Arbeitsbereich
  2 - kein Schleifensignal, Mower fährt aber weiter, unkritisch
+12 - angehoben, kann auch z. B. durch Maulwurfhügel oder Apfel passieren (350x)
 13 - kein Antrieb
+15 - kein Schleifensignal ? (350X)
 25 - Mäheinheit ist blockiert
 69 - ????
 71 - Mäher angehoben
@@ -212,7 +259,7 @@ const idnMowerConnected = 'info.connected',
     ThisIsTheEnd = 'ThisIsTheEnd';
 
 
-let mobjMower = [],
+let mobjMower = null,
     mQueryIntervalActive_s = 30,
     mQueryIntervalInactive_s = 300,
     mCurrentStatus = 'unknown',
@@ -620,6 +667,7 @@ function parkMower() {
     });
 } // parkMower()
 
+
 adapter.on('stateChange', function (id, state) {
     const fctName = 'subscription stateChange';
     let fctNameId = '';
@@ -806,7 +854,7 @@ function checkAMatHome(lat2, long2) {
 
     if (dist > mMaxDistance && mMaxDistance > 0) {
         // alarm
-        adapter.log.error(fctName + ' dist > mMaxDistance: ' + dist - mMaxDistance);
+        adapter.log.error(fctName + ' dist > mMaxDistance: ' + (dist - mMaxDistance));
 
         adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower ' + mobjMower.mower.name + ' state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
     }
@@ -976,6 +1024,12 @@ function dailyAccumulation(bCheck) {
 function updateStatus() {
     const fctName = 'updateStatus';
 
+    if(mobjMower == null) {
+        adapter.log.info(fctName + ' mower object is NULL');
+
+        return;
+    }
+
     if(mUpdateStatusRunning === true) {
         adapter.log.debug(fctName + ' already running, exit');
 
@@ -1133,94 +1187,98 @@ function updateStatus() {
             adapter.log.debug(fctName + ', geo_result.lastLocations.length:' + geo_result.lastLocations.length);
             adapter.log.debug(fctName + ', mLastLocationLongi:' + mLastLocationLongi + '; mLastLocationLati:' + mLastLocationLati);
 
-            // set home location data, if not set
-            if (mHomeLocationLongitude === 0 || mHomeLocationLongitude === '' || mHomeLocationLatitude === 0 || mHomeLocationLatitude === '') {
-                mHomeLocationLatitude = geo_result.centralPoint.location.latitude;
-                mHomeLocationLongitude = geo_result.centralPoint.location.longitude;
+            if (geo_result.lastLocations.length <= 0) {
+                adapter.log.error(fctName + ', no geoinformation received from mower! Connection lost?', 'error');
+            } else {
+                // set home location data, if not set
+                if (mHomeLocationLongitude === 0 || mHomeLocationLongitude === '' || mHomeLocationLatitude === 0 || mHomeLocationLatitude === '') {
+                    mHomeLocationLatitude = geo_result.centralPoint.location.latitude;
+                    mHomeLocationLongitude = geo_result.centralPoint.location.longitude;
 
-                adapter.setState(idnHomeLocationLatitude, mHomeLocationLatitude, true);
-                adapter.setState(idnHomeLocationLongitude, mHomeLocationLongitude, true);
-            }
-            // write server position data
-            adapter.setState(idnHomeLocationLatitudeCP, geo_result.centralPoint.location.latitude, true);
-            adapter.setState(idnHomeLocationLongitudeCP, geo_result.centralPoint.location.longitude, true);
-            adapter.setState(idnHomeLocationSensitivityLevel, geo_result.centralPoint.sensitivity.level, true);
-            adapter.setState(idnHomeLocationSensitivityRadius, geo_result.centralPoint.sensitivity.radius, true);
-
-            if (adapter.config.extendedStatistic) {
-                if (mStartMowingTime > 0) {
-                    // mowing time
-                    // find last position
-                    for (let j = 0; j < geo_result.lastLocations.length; j++) {
-                        //adapter.log.debug(fctName + ', j:' + j + '; geo_result.lastLocations[j].longitude:' + geo_result.lastLocations[j].longitude + '; geo_result.lastLocations[j].latitude:' + geo_result.lastLocations[j].latitude);
-
-                        if (geo_result.lastLocations[j].longitude === mLastLocationLongi && geo_result.lastLocations[j].latitude === mLastLocationLati) {
-                            // should like the last known position, data has no timestamp
-                            adapter.log.debug(fctName + ' last position found:' + JSON.stringify(geo_result.lastLocations[j]) + '; j:' + j);
-                            lpos = j;
-                        }
-                    }
-
-                    // accumulate positions and mileage beginnig from end if array (oldest positions)
-                    for (let i = lpos; i >= 0; i--) {
-                        //adapter.log.debug(fctName + ', i:' + i + '; geo_result.lastLocations[i].longitude:' + geo_result.lastLocations[i].longitude + '; geo_result.lastLocations[i].latitude:' + geo_result.lastLocations[i].latitude);
-
-                        position = {
-                            "longitude": geo_result.lastLocations[i].longitude,
-                            "latitude": geo_result.lastLocations[i].latitude,
-                            "time": result.storedTimestamp
-                        };
-                        //adapter.log.debug(fctName + ' position:' + JSON.stringify(position) + '; i:' + i + '; mCurrentStatus:' + mCurrentStatus + '; mLastStatus:' + mLastStatus);
-
-                        jsonNewPositions.push(position);      // save position
-                        //!P! check location; alle Positionen prüfen oder reicht letze Position --> checkAMatHome
-                        //!P! if out of frame --> alarm
-
-                        // add to distance, without timestams it's not poosible to determine cutting position exactly
-                        if ((mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO' || mCurrentStatus === 'OK_LEAVING') ||
-                            ((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && !(mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO'))) { // mileage only, if mower cutting
-                            if (i === lpos) {
-                                // distance to lastLocation
-                                newDist = newDist + getDistance(mLastLocationLati, mLastLocationLongi, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
-                            } else {
-                                newDist = newDist + getDistance(geo_result.lastLocations[i + 1].latitude, geo_result.lastLocations[i + 1].longitude, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
-                            }
-                            adapter.log.debug(fctName + ', i:' + i + '; newDist:' + newDist + '; [i + 1].latitude:' + geo_result.lastLocations[i + 1].latitude + '; [i + 1].longitude:' + geo_result.lastLocations[i + 1].longitude + '; [i].latitude:' + geo_result.lastLocations[i].latitude + '; [i].longitude:' + geo_result.lastLocations[i].longitude);
-                        }
-                    }
-                    mJsonLastLocations = mJsonLastLocations.concat(jsonNewPositions);      // add new positions
-                    mDist += newDist;
-                    mDistDaily += newDist;
-                    adapter.log.debug(fctName + ', add new distance; mDist: ' + mDist + '; mDistDaily: ' + mDistDaily + '; newDist: ' + newDist);
-
-                    //adapter.log.debug(fctName + '; idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
-                    adapter.log.debug(fctName + '; idnCurrentCoveredDistance: ' + precisionRound(mDist, 2));
-                    adapter.log.debug(fctName + '; idnCoveredDistanceDaily: ' + precisionRound(mDistDaily, 2));
-
-                    adapter.setState(idnLastLocations, JSON.stringify(mJsonLastLocations), true);
-                    adapter.setState(idnCurrentCoveredDistance, precisionRound(mDist, 2), true);
-                    adapter.setState(idnCoveredDistanceDaily, precisionRound(mDistDaily, 2), true);
+                    adapter.setState(idnHomeLocationLatitude, mHomeLocationLatitude, true);
+                    adapter.setState(idnHomeLocationLongitude, mHomeLocationLongitude, true);
                 }
-            }
+                // write server position data
+                adapter.setState(idnHomeLocationLatitudeCP, geo_result.centralPoint.location.latitude, true);
+                adapter.setState(idnHomeLocationLongitudeCP, geo_result.centralPoint.location.longitude, true);
+                adapter.setState(idnHomeLocationSensitivityLevel, geo_result.centralPoint.sensitivity.level, true);
+                adapter.setState(idnHomeLocationSensitivityRadius, geo_result.centralPoint.sensitivity.radius, true);
 
-            // check position in range
-            //!P! if out of frame --> alarm
-            checkAMatHome(geo_result.lastLocations[0].latitude, geo_result.lastLocations[0].longitude);
+                if (adapter.config.extendedStatistic) {
+                    if (mStartMowingTime > 0) {
+                        // mowing time
+                        // find last position
+                        for (let j = 0; j < geo_result.lastLocations.length; j++) {
+                            //adapter.log.debug(fctName + ', j:' + j + '; geo_result.lastLocations[j].longitude:' + geo_result.lastLocations[j].longitude + '; geo_result.lastLocations[j].latitude:' + geo_result.lastLocations[j].latitude);
 
-            if (mLastLocationLongi !== geo_result.lastLocations[0].longitude && mLastLocationLongi !== geo_result.lastLocations[0].latitude) {
-                // update last location
-                adapter.setState(idnLastLocationLongitude, geo_result.lastLocations[0].longitude, true);
-                adapter.setState(idnLastLocationLatitude, geo_result.lastLocations[0].latitude, true);
+                            if (geo_result.lastLocations[j].longitude === mLastLocationLongi && geo_result.lastLocations[j].latitude === mLastLocationLati) {
+                                // should like the last known position, data has no timestamp
+                                adapter.log.debug(fctName + ' last position found:' + JSON.stringify(geo_result.lastLocations[j]) + '; j:' + j);
+                                lpos = j;
+                            }
+                        }
 
-                mLastLocationLongi = geo_result.lastLocations[0].longitude;
-                mLastLocationLati = geo_result.lastLocations[0].latitude;
+                        // accumulate positions and mileage beginnig from end if array (oldest positions)
+                        for (let i = lpos; i >= 0; i--) {
+                            //adapter.log.debug(fctName + ', i:' + i + '; geo_result.lastLocations[i].longitude:' + geo_result.lastLocations[i].longitude + '; geo_result.lastLocations[i].latitude:' + geo_result.lastLocations[i].latitude);
 
-                adapter.setState(idnLastLocationTimestamp, result.storedTimestamp, true);      // !?
+                            position = {
+                                "longitude": geo_result.lastLocations[i].longitude,
+                                "latitude": geo_result.lastLocations[i].latitude,
+                                "time": result.storedTimestamp
+                            };
+                            //adapter.log.debug(fctName + ' position:' + JSON.stringify(position) + '; i:' + i + '; mCurrentStatus:' + mCurrentStatus + '; mLastStatus:' + mLastStatus);
 
-                // Offset
-                if (mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER' || mCurrentStatus === 'OFF_DISABLED') {
-                    adapter.setState(idnHomeLocationLongitudeOffset, geo_result.lastLocations[0].longitude, true);
-                    adapter.setState(idnHomeLocationLatitudeOffset, geo_result.lastLocations[0].latitude, true);
+                            jsonNewPositions.push(position);      // save position
+                            //!P! check location; alle Positionen prüfen oder reicht letze Position --> checkAMatHome
+                            //!P! if out of frame --> alarm
+
+                            // add to distance, without timestams it's not poosible to determine cutting position exactly
+                            if ((mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO' || mCurrentStatus === 'OK_LEAVING') ||
+                                ((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && !(mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO'))) { // mileage only, if mower cutting
+                                if (i === lpos) {
+                                    // distance to lastLocation
+                                    newDist = newDist + getDistance(mLastLocationLati, mLastLocationLongi, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
+                                } else {
+                                    newDist = newDist + getDistance(geo_result.lastLocations[i + 1].latitude, geo_result.lastLocations[i + 1].longitude, geo_result.lastLocations[i].latitude, geo_result.lastLocations[i].longitude);
+                                }
+                                adapter.log.debug(fctName + ', i:' + i + '; newDist:' + newDist + '; [i + 1].latitude:' + geo_result.lastLocations[i + 1].latitude + '; [i + 1].longitude:' + geo_result.lastLocations[i + 1].longitude + '; [i].latitude:' + geo_result.lastLocations[i].latitude + '; [i].longitude:' + geo_result.lastLocations[i].longitude);
+                            }
+                        }
+                        mJsonLastLocations = mJsonLastLocations.concat(jsonNewPositions);      // add new positions
+                        mDist += newDist;
+                        mDistDaily += newDist;
+                        adapter.log.debug(fctName + ', add new distance; mDist: ' + mDist + '; mDistDaily: ' + mDistDaily + '; newDist: ' + newDist);
+
+                        //adapter.log.debug(fctName + '; idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
+                        adapter.log.debug(fctName + '; idnCurrentCoveredDistance: ' + precisionRound(mDist, 2));
+                        adapter.log.debug(fctName + '; idnCoveredDistanceDaily: ' + precisionRound(mDistDaily, 2));
+
+                        adapter.setState(idnLastLocations, JSON.stringify(mJsonLastLocations), true);
+                        adapter.setState(idnCurrentCoveredDistance, precisionRound(mDist, 2), true);
+                        adapter.setState(idnCoveredDistanceDaily, precisionRound(mDistDaily, 2), true);
+                    }
+                }
+
+                // check position in range
+                //!P! if out of frame --> alarm
+                checkAMatHome(geo_result.lastLocations[0].latitude, geo_result.lastLocations[0].longitude);
+
+                if (mLastLocationLongi !== geo_result.lastLocations[0].longitude && mLastLocationLongi !== geo_result.lastLocations[0].latitude) {
+                    // update last location
+                    adapter.setState(idnLastLocationLongitude, geo_result.lastLocations[0].longitude, true);
+                    adapter.setState(idnLastLocationLatitude, geo_result.lastLocations[0].latitude, true);
+
+                    mLastLocationLongi = geo_result.lastLocations[0].longitude;
+                    mLastLocationLati = geo_result.lastLocations[0].latitude;
+
+                    adapter.setState(idnLastLocationTimestamp, result.storedTimestamp, true);      // !?
+
+                    // Offset
+                    if (mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER' || mCurrentStatus === 'OFF_DISABLED') {
+                        adapter.setState(idnHomeLocationLongitudeOffset, geo_result.lastLocations[0].longitude, true);
+                        adapter.setState(idnHomeLocationLatitudeOffset, geo_result.lastLocations[0].latitude, true);
+                    }
                 }
             }
             adapter.log.debug(fctName + ' geo finished');
@@ -1335,9 +1393,9 @@ function updateStatus() {
             // ? PARKED_PARKED_SELECTED ??
             if ((mCurrentStatus === 'OK_CHARGING' && mLastStatus !== 'OK_CHARGING') || (mCurrentStatus === 'PARKED_AUTOTIMER' && mLastStatus !== 'PARKED_AUTOTIMER' && mBatteryPercent < 100)) {     // mLastStatus === 'unknown' or other regular status
                 // start charging?
-                adapter.log.debug(fctName + ', mower start charging?; mChargingStartTime: ' + mChargingStartTime + '; new Date().getTime(): ' + new Date().getTime() + '; mChargingTimeBatteryNew: ' + mChargingTimeBatteryNew);
+                adapter.log.debug(fctName + ', mower start charging?; mChargingStartTime: ' + mChargingStartTime + '; new Date().getTime(): ' + new Date().getTime() + '; mChargingTimeBatteryNew: ' + (mChargingTimeBatteryNew * 60 * 1000) + ' ms');
 
-                if (mChargingStartTime === 0 || mChargingStartTime < (new Date().getTime() - mChargingTimeBatteryNew)) {
+                if (mChargingStartTime === 0 || mChargingStartTime < (new Date().getTime() - (mChargingTimeBatteryNew * 60 * 1000))) {
                     // start charging
                     mChargingStartTime = new Date().getTime();
                     adapter.setState(idnChargingStartTime, mChargingStartTime, true);
@@ -1383,24 +1441,24 @@ function updateStatus() {
                 mChargingTimeBatteryCurrent = 0;
                 // !P! ??? adapter.setState(idnChargingStartTime, mChargingStartTime, true);
             }
+        }
+        adapter.log.debug(fctName + ', mBatteryPercent: ' + mBatteryPercent + '; mScheduleStatus: ' + mScheduleStatus + '; mScheduleTime: ' + mScheduleTime);
+        if (mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER') {
+            // charging --> inactive poll timer
+            if (mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== mQueryIntervalInactive_s)) {
+                mScheduleTime = mQueryIntervalInactive_s;
 
-            adapter.log.debug(fctName + ', mBatteryPercent: ' + mBatteryPercent + '; mScheduleStatus: ' + mScheduleStatus + '; mScheduleTime: ' + mScheduleTime);
-            if (mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER') {
-                // charging --> inactive poll timer
-                if (mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== mQueryIntervalInactive_s)) {
-                    mScheduleTime = mQueryIntervalInactive_s;
+                createStatusScheduler();
+            }
+        } else {
+            // error or active or other
+            if (mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== mQueryIntervalActive_s)) {
+                mScheduleTime = mQueryIntervalActive_s;
 
-                    createStatusScheduler();
-                }
-            } else {
-                // error or active or other
-                if (mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== mQueryIntervalActive_s)) {
-                    mScheduleTime = mQueryIntervalActive_s;
-
-                    createStatusScheduler();
-                }
+                createStatusScheduler();
             }
         }
+
 
         /* !P!
             PARKED_AUTOTIMER
@@ -1564,6 +1622,10 @@ function syncConfig(callback) {
                     if(adapter.config.extendedStatistic) mMowingTimeDaily = parseInt(idStates[idState].val);
                     break;
             }
+        }
+        // if battery loaded, then reset stat charging
+        if(mBatteryPercent = 100) {
+            mChargingStartTime = 0;
         }
         adapter.log.debug(fctName + ', idnLastStatus: ' + mLastStatus + ', idnNextStartTime: ' + mNextStart + ', idnStoppedDueRain: ' + mStoppedDueRain + ', idnCurrentErrorCode: ' + mLastErrorCode + ', idnCurrentErrorCodeTS: ' + mLastErrorCodeTimestamp);
         adapter.log.debug(fctName + ', idnCurrentCoveredDistance: ' + mDist + ', idnLastLocationLongitude: ' + mLastLocationLongi + ', idnLastLocationLatitude: ' + mLastLocationLati + ', idnHomeLocationLongitude: ' + mHomeLocationLongitude + ', idnHomeLocationLatitude: ' + mHomeLocationLongitude);
