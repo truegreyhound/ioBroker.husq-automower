@@ -16,12 +16,17 @@
 //!V! 0.3.14.0
 /*
 mower.lastStartTime --> mower.statistics.mowingStartTime
-Regenwertvergleich bei number jetzt >=
+Regenwertvergleich bei number: bei 0 oder 1 ==, sonst >=, Typ des Wertes wird aus DP des Sensors gelesen
 Zähler für Anzahl WebRequests je Tag und kumulativ Monat (idnWebRequestCountXXXXX)
 
 */
 
 //!P! Beim daily-Lauf eine Kopie aller Datenpunkte erstellen und im Dateisystem speichern
+
+//!P! Wenn Adapter startet und mLastStatus == unknown, dann setState(idnSendMessage, <Message>) unterdrücken
+
+//!I! Das Unterdrücken des Starts des Mowers bei Regen ist ohne Kenntnis der Startzeiten nicht sinnvoll umsetzbar.
+
 
 //!I! in den Husqvarna-GPS-Daten fehlt Zeitstempel!
 //!I! Adapter setzt voraus, dass Mower spätestens Mitternacht eingeparkt hat
@@ -46,7 +51,7 @@ Zähler für Anzahl WebRequests je Tag und kumulativ Monat (idnWebRequestCountXX
 
 //!P! ERROR_CODES_MT mehrsprachig ausfühen, dann in Konfiguration AUswahlbox für Anzeige Fehlercodes
 
-//!P! Option in Cfg für automatischen Neustart nach Regen
+//!P! Option in Cfg für automatischen Neustart nach Regen (Option vorhanden, <0 - disabled, >= - aktiv)
 //!P! Option in Cfg für Aktion bei Regen --> park bis auf weiters | Start mit nächster Timereinstellung | parken für 3, 6 oder 12h
 //!P! auf Handy-App gibt es bei Parken 4 Möglichkeiten: " BIS AUF WEITERES" | Start mit nächster Timereinstellung | parken für "3 STUNDEN" |"6 STUNDEN" |"12 STUNDEN"
 //!P! auf Handy-App gibt es bei Starten: "IM HAUPTBEREICH FORTSETZEN" | Timer aufheben für "3 STUNDEN" |"6 STUNDEN" |"12 STUNDEN"
@@ -255,13 +260,13 @@ const idnMowerConnected = 'info.connected',
     idnLastStatusChangeTime = 'mower.lastStatusChangeTime',
     idnLastDayLocations = 'mower.lastdayLocations',
     idnNextStartSource = 'mower.nextStartSource',
-    idnNextStartTime = 'mower.nextStartTime',        // --> io-package
+    idnNextStartTime = 'mower.nextStartTime',                       // --> io-package
     idnNextStartWatching = 'mower.nextStartWatching',               // ?????
     idnOperatingMode = 'mower.operatingMode',
-    idnStopOnRainEnabled = 'mower.stopOnRainEnabled', // opy from config
-    idnStoppedDueRain = 'mower.stoppedDueRain',
+    idnStopOnRainEnabled = 'mower.stopOnRainEnabled',               // copy from config
+    idnStoppedDueToRain = 'mower.stoppedDueRain',                   // stopped due to rain 
     idnTimerAfterRainStartAt = 'mower.timerAfterRainStartAt',
-    idnWaitAfterRain = 'mower.waitAfterRain',       // copy from config
+    idnWaitAfterRain = 'mower.waitAfterRain',                       // copy from config
     idnRawSend = 'mower.rawSend',
     idnRawResponse = 'mower.rawResponse',
     idnRawResponseGeo = 'mower.rawResponse_geo',
@@ -289,7 +294,7 @@ let mobjMower = null,
     mHomeLocationLongitude = 0,
     mHomeLocationLatitude = 0,
     mNextStart = 0,
-    mStoppedDueRain = false,
+    mStoppedDueToRain = false,
     mLastErrorCode = 0,
     mLastErrorCodeTimestamp = 0,
     mJsonLastLocations = [],
@@ -323,7 +328,10 @@ let mobjMower = null,
     mnWebRequestCountDay = 0,
     mnWebRequestCountDay_success = 0,
     mnWebRequestCountDay_error = 0,
+    mnWebRequestCountDay_error_Check = 0,
     ThisIsTheEnd2;
+
+const MSG_PRIO = {'info': 3, 'warn': 2, 'alarm': 1, 'intern': 9};
 
 const ERROR_CODES_MT = {
     '320': {        // 330X
@@ -374,6 +382,7 @@ const ERROR_CODES_MT = {
 
 //!P! abhängig vom Typ zuweisen
 let ERROR_CODES = ERROR_CODES_MT['320'];
+
 
 adapter.on('unload', function (callback) {
     try {
@@ -601,7 +610,7 @@ function createDPs() {
     createState(idnNextStartWatching, false);
     createState(idnOperatingMode, 'unkonwn');
     createState(idnStopOnRainEnabled, false);
-    createState(idnStoppedDueRain, false, idnStoppedDueRain, true);
+    createState(idnStoppedDueToRain, false, idnStoppedDueToRain, true);
     createState(idnTimerAfterRainStartAt, 0, idnTimerAfterRainStartAt, true);
     createState(idnWaitAfterRain, 0, idnWaitAfterRain, false, "min.");
     createState(idnSendMessage, '');
@@ -683,12 +692,12 @@ function handleMowerOnRain(isRaining) {
             }
 
             sMsg = fctName + ' switch to rain; send mower ' + mobjMower.mower.name + ' command "park"';
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName, isRaining, 1, 'Tg,EL']), true);
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName, 'rain sensor', MSG_PRIO.warn]), true);
         //}
     }
-/* !P!
-    if (isRaining === false && adapter.config.stopOnRainEnabled === true) {
-        // rain is over, wait if gras is dry
+
+    if (isRaining === false && mWaitAfterRain_min >= 0) {
+        // rain is over, "wait if gras is dry"
         if (mWaitAfterRainTimer !== null) {
             clearTimeout(mWaitAfterRainTimer);
             mWaitAfterRainTimer = null;
@@ -703,9 +712,9 @@ function handleMowerOnRain(isRaining) {
         adapter.setState(idnTimerAfterRainStartAt, new Date().getTime(), true);
 
         sMsg = fctName + ' to no rain; wait ' + mWaitAfterRain_min + ' min. for starting mower ' + mobjMower.mower.name ;
-        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' changed', isRaining, 1, 'Tg,EL']), true);
+        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' changed', isRaining, MSG_PRIO.warn]), true);
     }
-*/
+
     adapter.log.debug(fctName + ' finished');
 
 } // handleMowerOnRain()
@@ -760,35 +769,49 @@ adapter.on('stateChange', function (id, state) {
         let iddp = id.substr(adapter.namespace.length + 1);
 
         if(id !== '' && id === adapter.config.idRainSensor) {
-            // adapter.config.rainSensorValue - [bool, true]
+            // adapter.config.rainSensorValue - true|1|3.2|?
             fctNameId = 'subscription rainsensor change';
 
-            let bRain = parseBool(state.val),
-                sMsg = '',
-                vTest = adapter.config.rainSensorValue;
+            adapter.getForeignObject(adapter.config.idRainSensor, function (err, oidState) {
+                if (err) {
+                    adapter.log.error(err);
+    
+                    return;
+                }
 
-            if(vTest !== '' && typeof vTest === 'object') {
-                switch (vTest[0]) {
-                    case 'bool':
-                        bRain = (parseBool(state.val) === vTest[1]);
+                const idStateType = oidState.common.type;
+
+                
+                let bRain = false;
+
+                adapter.log.debug(fctName + ', getForeignState; adapter.config.rainSensorValue: "' + adapter.config.rainSensorValue + '"; idStateType: ' + idStateType); 
+
+                switch (idStateType) {
+                    case 'boolean':
+                        bRain = (parseBool(state.val) === parseBool(adapter.config.rainSensorValue));
                         break;
                     case 'number':
-                        bRain = (parseInt(state.val) >= vTest[1]);
+                        if (adapter.config.rainSensorValue == '0' || adapter.config.rainSensorValue == '1') {
+                            // compare equal
+                            bRain = (parseInt(state.val) === parseInt(adapter.config.rainSensorValue));
+                        } else {
+                            // compare >=
+                            bRain = (parseFloat(state.val) >= parseFloat(adapter.config.rainSensorValue.replace(',', '.')));
+                        }
                         break;
                     default:
-                        bRain = (state.val === vTest[1]);
+                        bRain = (state.val === adapter.config.rainSensorValue);
                         break;
                 }
-            }
 
-            adapter.log.debug(fctNameId + ',  id: "' + id + '"; state.val: ' + state.val + '"; vTest[0]: ' + vTest[0] + '"; state.val=== vTest[1]: ' + state.val === vTest[1] + '; bRain: ' + bRain);
-            adapter.log.debug(fctNameId + ', mLastStatus: ' + mLastStatus);
+                adapter.log.debug(fctNameId + ',  id: "' + id + '"; bRain: ' + bRain + '; mLastStatus: ' + mLastStatus);
 
-            adapter.setState(idnStoppedDueRain, bRain, true);
+                adapter.setState(idnStoppedDueToRain, bRain, true);
 
-            handleMowerOnRain(!parseBool(bRain));
+                handleMowerOnRain(parseBool(bRain));
 
-            adapter.log.debug(fctNameId + ' finished', 'debug2');
+                adapter.log.debug(fctNameId + ' finished', 'debug2');
+            });
         }
 
         switch (iddp) {
@@ -819,13 +842,13 @@ adapter.on('stateChange', function (id, state) {
                     } else if (state.val === 77) {
                         adapter.log.debug(fctNameId + ', toggle rain detected');
 
-                        adapter.getState(idnStoppedDueRain, function (err, stateSDR) {
+                        adapter.getState(idnStoppedDueToRain, function (err, stateSDR) {
                             if (!err && stateSDR) {
-                                adapter.setState(idnStoppedDueRain, !parseBool(stateSDR.val), true);
+                                adapter.setState(idnStoppedDueToRain, parseBool(stateSDR.val), true);
 
-                                mStoppedDueRain = !parseBool(stateSDR.val);
+                                mStoppedDueToRain = parseBool(!stateSDR.val);
 
-                                handleMowerOnRain(!parseBool(stateSDR.val));        // but not event trouhg seState !?
+                                handleMowerOnRain(parseBool(!stateSDR.val));        // but not event trouhg seState !?
                             }
                         });
 
@@ -855,11 +878,11 @@ adapter.on('stateChange', function (id, state) {
                 adapter.log.debug(fctNameId + ' finished');
                 break;
 
-            case idnStoppedDueRain:
+            case idnStoppedDueToRain:
                 fctNameId = 'subscrition StoppedDueRain changed';
-                adapter.log.debug(fctNameId + ',  id: "' + idnStoppedDueRain + '"; state.val: ' + state.val + '; adapter.config.stopOnRainEnabled: ' + adapter.config.stopOnRainEnabled);
+                adapter.log.debug(fctNameId + ',  id: "' + idnStoppedDueToRain + '"; state.val: ' + state.val + '; adapter.config.stopOnRainEnabled: ' + adapter.config.stopOnRainEnabled);
 
-                mStoppedDueRain = state.val;
+                mStoppedDueToRain = state.val;
 
                 handleMowerOnRain(state.val);
 
@@ -870,7 +893,7 @@ adapter.on('stateChange', function (id, state) {
 
                 if(state.val === false) {
                     const sMsg = fctNameId + ' for mower ' + mobjMower.mower.name + ' to FALSE';
-                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctNameId + ' for mower ' + mobjMower.mower.name , false, 1, 'Tg,EL']), true);
+                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctNameId + ' for mower ' + mobjMower.mower.name , idnMowerConnected, MSG_PRIO.warn]), true);
                 }
 
                 break;
@@ -938,7 +961,7 @@ function checkAMatHome(lat2, long2) {
         // alarm
         adapter.log.error(fctName + ' dist > mMaxDistance: ' + (dist - mMaxDistance));
 
-        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower ' + mobjMower.mower.name + ' state changed', Math.round(dist) + ' m', 3, 'Tg,Ma,EL']), true);
+        adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), 'max disctance exceeded (' + Math.round(dist) + ' m)\r\ncurrent position ' + UrlGoogleMaps + lat2 + ',' + long2, 'mower ' + mobjMower.mower.name + ' state changed', 'GPS data', MSG_PRIO.alarm]), true);
     }
 
     adapter.log.debug(fctName + ' finished; dist: ' + dist);
@@ -1098,49 +1121,60 @@ function dailyAccumulation(bCheck) {
     adapter.log.debug(fctName + ', add daily http request counter to month ...');
     // add to month values
     let nDateMonth = (new Date()).getMonth();
+    let nDateDay = (new Date()).getDay();
 
-    let nDateMonth_TS = 0;
+    let nDateRCM_Month_TS = 0;
     adapter.getState(idnWebRequestCountMonth, function (errRCM, stateRCM) {
         if (!errRCM && stateRCM) {
             adapter.log.debug(fctName + ', stateRCM.ts: ' + stateRCM.ts + '; Date: ' + new Date(stateRCM.ts));
 
-            nDateMonth_TS = (new Date(stateRCM.ts)).getMonth();
+            nDateRCM_Month_TS = (new Date(stateRCM.ts)).getMonth();
 
-            adapter.log.debug(fctName + ', nDateMonth: ' + nDateMonth + '; nDateMonth_TS: ' + nDateMonth_TS);
+            adapter.log.debug(fctName + ', nDateMonth: ' + nDateMonth + '; nDateRCM_Month_TS: ' + nDateRCM_Month_TS);
 
-            if (nDateMonth != nDateMonth_TS) {
-                // first day of month or script has paused
-                adapter.setState(idnWebRequestCountMonth, mnWebRequestCountDay, true);
-                adapter.setState(idnWebRequestCountMonth_success, mnWebRequestCountDay_success, true);
-                adapter.setState(idnWebRequestCountMonth_error, mnWebRequestCountDay_error, true);
+            let nDateRCD_Month_TS = 0;
+            let nDateRCD_Day_TS = 0;
+            adapter.getState(idnWebRequestCountDay, function (errRCD, stateRCD) {
+                if (!errRCD && stateRCD) {
+                    adapter.log.debug(fctName + ', stateRCD.ts: ' + stateRCD.ts + '; Date: ' + new Date(stateRCD.ts));
+        
+                    nDateRCD_Month_TS = (new Date(stateRCD.ts)).getMonth();
+                    nDateRCD_Day_TS = (new Date(stateRCD.ts)).getDay();
+        
+                    adapter.log.debug(fctName + ', nDateMonth: ' + nDateMonth + '; nDateRCD_Month_TS: ' + nDateRCD_Month_TS + '; nDateRCD_Day_TS: ' + nDateRCD_Day_TS);
+        
+                    adapter.getState(idnWebRequestCountMonth, function (errWRCM, stWebRequestCountMonth) {
+                        adapter.getState(idnWebRequestCountMonth_success, function (errWRCMs, stWebRequestCountMonth_success) {
+                            adapter.getState(idnWebRequestCountMonth_error, function (errWRCMe, stWebRequestCountMonth_error) {
 
-                // reset http status counter
-                mnWebRequestCountDay = 0;
-                mnWebRequestCountDay_success = 0;
-                mnWebRequestCountDay_error = 0;
-                adapter.setState(idnWebRequestCountDay, 0, true);
-                adapter.setState(idnWebRequestCountDay_success, 0, true);
-                adapter.setState(idnWebRequestCountDay_error, 0, true);
-            } else {
-                adapter.getState(idnWebRequestCountMonth, function (errWRCM, stWebRequestCountMonth) {
-                    adapter.getState(idnWebRequestCountMonth_success, function (errWRCMs, stWebRequestCountMonth_success) {
-                        adapter.getState(idnWebRequestCountMonth_error, function (errWRCMe, stWebRequestCountMonth_error) {
+                                if (nDateMonth != nDateRCD_Month_TS || nDateDay != nDateRCD_Day_TS) {
+                                    // set cummulate counters
+                                    adapter.setState(idnWebRequestCountMonth, stWebRequestCountMonth.val + mnWebRequestCountDay, true);
+                                    adapter.setState(idnWebRequestCountMonth_success, stWebRequestCountMonth_success.val + mnWebRequestCountDay_success, true);
+                                    adapter.setState(idnWebRequestCountMonth_error, stWebRequestCountMonth_error.val + mnWebRequestCountDay_error, true);
 
-                            adapter.setState(idnWebRequestCountMonth, stWebRequestCountMonth.val + mnWebRequestCountDay, true);
-                            adapter.setState(idnWebRequestCountMonth_success, stWebRequestCountMonth_success.val + mnWebRequestCountDay_success, true);
-                            adapter.setState(idnWebRequestCountMonth_error, stWebRequestCountMonth_error.val + mnWebRequestCountDay_error, true);
+                                    // reset http status counter for day
+                                    mnWebRequestCountDay = 0;
+                                    mnWebRequestCountDay_success = 0;
+                                    mnWebRequestCountDay_error = 0;
+                                    mnWebRequestCountDay_error_Check = 0;
 
-                            // reset http status counter
-                            mnWebRequestCountDay = 0;
-                            mnWebRequestCountDay_success = 0;
-                            mnWebRequestCountDay_error = 0;
-                            adapter.setState(idnWebRequestCountDay, 0, true);
-                            adapter.setState(idnWebRequestCountDay_success, 0, true);
-                            adapter.setState(idnWebRequestCountDay_error, 0, true);
+                                    adapter.setState(idnWebRequestCountDay, 0, true);
+                                    adapter.setState(idnWebRequestCountDay_success, 0, true);
+                                    adapter.setState(idnWebRequestCountDay_error, 0, true);
+                                }
+
+                                if (nDateMonth != nDateRCM_Month_TS) {
+                                    // first day of month or script has paused --> reset http status counter for month
+                                    adapter.setState(idnWebRequestCountMonth, 0, true);
+                                    adapter.setState(idnWebRequestCountMonth_success, 0, true);
+                                    adapter.setState(idnWebRequestCountMonth_error, 0, true);
+                                } 
+                            });
                         });
                     });
-                });
-            }
+                }
+            });
         }
     });
 
@@ -1171,6 +1205,73 @@ function updateStatus() {
 
     mUpdateStatusRunning = true;
 
+    // normaly the subscription on adapter.config.idRainSensor should set the rain flag
+    if(adapter.config.idRainSensor !== '' && adapter.config.stopOnRainEnabled == true) {
+        adapter.log.debug(fctName + ', idRainSensor: ' + adapter.config.idRainSensor);            // mqtt.0.hm-rpc.0.OEQ0996420.1.STATE
+
+        // get current state
+        adapter.getForeignState(adapter.config.idRainSensor, function (err, idState) {
+            if (err) {
+                adapter.log.error(err);
+
+                return;
+            }
+            if (!idState) {
+                adapter.log.error(fctName + ', getForeignState; idRainSensor: ' + adapter.config.idRainSensor + ';  object for "getForeignState(adapter.config.idRainSensor, ...)" is: ' + JSON.stringify(idState));
+
+                return;
+            }
+            adapter.log.debug(fctName + ', getForeignState; idRainSensor: ' + adapter.config.idRainSensor + '; idState: ' + JSON.stringify(idState)); 
+            // idState: {"val":0,"ack":true,"ts":1596924551829,"q":0,"from":"system.adapter.mqtt.0","user":"system.user.admin","lc":1596220067889}
+
+
+            adapter.getForeignObject(adapter.config.idRainSensor, function (err, oidState) {
+                if (err) {
+                    adapter.log.error(err);
+    
+                    return;
+                }
+
+                const idStateType = oidState.common.type;
+
+                
+                let bRain = false;
+
+                adapter.log.debug(fctName + ', getForeignState; adapter.config.rainSensorValue: "' + adapter.config.rainSensorValue + '"; idStateType: ' + idStateType); 
+
+                switch (idStateType) {
+                    case 'boolean':
+                        bRain = (parseBool(idState.val) === parseBool(adapter.config.rainSensorValue));
+                        break;
+                    case 'number':
+                        if (adapter.config.rainSensorValue == '0' || adapter.config.rainSensorValue == '1') {
+                            // compare equal
+                            bRain = (parseInt(idState.val) === parseInt(adapter.config.rainSensorValue));
+                        } else {
+                            // compare >=
+                            bRain = (parseFloat(idState.val) >= parseFloat(adapter.config.rainSensorValue.replace(',', '.')));
+                        }
+                        break;
+                    default:
+                        bRain = (idState.val === adapter.config.rainSensorValue);
+                        break;
+                }
+
+                if (mStoppedDueToRain != bRain) {
+                    if(bRain) {
+                        adapter.setState(idnStoppedDueToRain, true, true);
+                        adapter.log.debug(fctName + ', getForeignState; idRainSensor (it`s raining)');
+                    } else {
+                        adapter.setState(idnStoppedDueToRain, false, true);
+                        adapter.log.debug(fctName + ', getForeignState; idRainSensor (no rain)');
+                    }
+
+                    adapter.setState(idnStoppedDueToRain, bRain);
+                }
+            });
+        });
+    } // if(adapter.config.idRainSensor !== '' && adapter.config.stopOnRainEnabled == true)
+
     adapter.log.debug(fctName + ' typeof mobjMower: ' + typeof mobjMower);
 
     // timestamps in seconds
@@ -1189,18 +1290,19 @@ function updateStatus() {
         if (typeof response === 'undefined' || typeof result === 'undefined') {
             mUpdateStatusRunning = false;
 
-            adapter.log.error(fctName + ' typeof response or result === undefined');
+            adapter.log.warn(fctName + ' typeof response or result === undefined');
 
             mnWebRequestCountDay_error++;
+            mnWebRequestCountDay_error_Check++;
             adapter.setState(idnWebRequestCountDay_error, mnWebRequestCountDay_error, true);
 
-            if (mnWebRequestCountDay_error == 4) {
+            if (mnWebRequestCountDay_error_Check == 4) {
                 // Message
                 const sMsg = fctName + ', error on getting status for mower ' + mobjMower.mower.name + ', error on getting status';
-                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'error on getting status for mower ' + mobjMower.mower.name, false, 1, 'Tg,EL']), true);
+                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'error on getting status for mower ' + mobjMower.mower.name, 'Mower.getStatus', MSG_PRIO.alarm]), true);
             }
 
-            if ((adapter.setState) && mnWebRequestCountDay_error > 10) adapter.setState('info.connection', false, true);
+            if ((adapter.setState) && mnWebRequestCountDay_error_Check > 10) adapter.setState('info.connection', false, true);
 
             return;
         }
@@ -1238,6 +1340,7 @@ function updateStatus() {
             adapter.log.error(fctName + ' response.statusCode: ' + response.statusCode);
 
             mnWebRequestCountDay_error++;
+            mnWebRequestCountDay_error_Check++;
             adapter.setState(idnWebRequestCountDay_error, mnWebRequestCountDay_error, true);
 
             return;
@@ -1249,7 +1352,6 @@ function updateStatus() {
 
         adapter.setState(idnWebRequestCountDay_success, mnWebRequestCountDay_success, true);
 
-        mnWebRequestCountDay_error = 0;
         adapter.setState(idnWebRequestCountDay_error, mnWebRequestCountDay_error, true);
 
         if (adapter.config.saveRawData) {
@@ -1257,6 +1359,8 @@ function updateStatus() {
         }
 
         if (mLastErrorCode !== result.lastErrorCode) {
+            adapter.log.debug('ERROR_CODES: ' + JSON.stringify(ERROR_CODES));
+
             adapter.setState(idnCurrentErrorCode, parseInt(result.lastErrorCode), true);
             // !P! umstellen auf Sprachkonfig
             let sErrorMsg = '<unknown>';
@@ -1265,11 +1369,11 @@ function updateStatus() {
             adapter.setState(idnCurrentErrorMsg, sErrorMsg, true);
             adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp > 0) ? (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60)) : result.lastErrorCodeTimestamp, true);
 
-            if (ERROR_CODES[result.lastErrorCode].alarm) {
+            if (ERROR_CODES[result.lastErrorCode]['alarm']) {
             //!P! if(parseInt(result.lastErrorCode) === 71) {
                 // mower lifted
                 const sMsg = fctName + ' alarm for mower ' + mobjMower.mower.name + ' mower lifted, errorcode 71';
-                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'alarm for mower ' + mobjMower.mower.name, false, 1, 'Tg,EL']), true);
+                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'alarm for mower ' + mobjMower.mower.name, 'mower.status.response', MSG_PRIO.alarm]), true);
             }
             if (parseInt(result.lastErrorCode) === 0 && mLastErrorCode > 0) {
                 adapter.setState(idnLastErrorCode, mLastErrorCode, true);
@@ -1282,7 +1386,7 @@ function updateStatus() {
             }
 
             const sMsg = fctName + ' mower ' + mobjMower.mower.name + ' error state changed, from "' + mLastErrorCode + '" to "' + result.lastErrorCode + '"\r\ncurrent position ' + UrlGoogleMaps + sLastLatitide + ',' + sLastLongitude;
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' error state changed', result.lastErrorCode, 2, 'Tg,EL']), true);
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' error state changed', 'mower.status.response', MSG_PRIO.alarm]), true);
 
             mLastErrorCode = parseInt(result.lastErrorCode);
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
@@ -1312,7 +1416,7 @@ function updateStatus() {
             mAlarmOnBatteryPercent = true;
 
             const sMsg = fctName + ' mower ' + mobjMower.mower.name + ' battery charge too low: ' + result.batteryPercent;
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' mower ' + mobjMower.mower.name + ' battery charge too low!', result.batteryPercent, 1, 'Tg,EL']), true);
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, fctName + ' mower ' + mobjMower.mower.name + ' battery charge too low!', 'mower.status.response', MSG_PRIO.warn]), true);
         }
         if(parseInt(result.batteryPercent) >= adapter.config.alarmOnBatteryPercent) {
             // reset alarm
@@ -1399,7 +1503,7 @@ function updateStatus() {
                             //!P! check location; alle Positionen prüfen oder reicht letze Position --> checkAMatHome
                             //!P! if out of frame --> alarm
 
-                            // add to distance, without timestams it's not poosible to determine cutting position exactly
+                            // add to distance, without timestamps it's not poosible to determine cutting position exactly
                             if ((mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO' || mCurrentStatus === 'OK_LEAVING') ||
                                 ((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && !(mCurrentStatus === 'OK_CUTTING' || mCurrentStatus === 'OK_CUTTING_NOT_AUTO'))) { // mileage only, if mower cutting
                                 if (i === lpos) {
@@ -1455,7 +1559,7 @@ function updateStatus() {
         // !P! wenn Status sich ändert haben wir tc oder? - Wofür?
         if (mCurrentStatus != mLastStatus) {
             sMsg = 'updateStatus, mower ' + mobjMower.mower.name + ' state changed, from "' + mLastStatus + '" to "' + mCurrentStatus + '"';
-            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' state changed', mCurrentStatus, 1, 'Tg,EL']), true);
+            adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' state changed', 'mower.status.response', MSG_PRIO.info]), true);
 
             adapter.setState(idnLastStatusChangeTime, result.storedTimestamp, true);
         }
@@ -1465,6 +1569,8 @@ function updateStatus() {
                 mStartMowingTime = new Date().getTime();        // start mowing
 
                 adapter.setState(idnMowingStartTime, mStartMowingTime, true);
+
+                if (parseBool(mStoppedDueToRain)) handleMowerOnRain(parseBool(mStoppedDueToRain));                // wenn Regen, dann gleich wieder stoppen
             }
 
 
@@ -1490,19 +1596,21 @@ function updateStatus() {
                     // start mowing
                     mStartMowingTime = new Date().getTime();
                     adapter.setState(idnMowingStartTime, mStartMowingTime, true);
+
+                    if (parseBool(mStoppedDueToRain)) handleMowerOnRain(parseBool(mStoppedDueToRain));                // wenn Regen, dann gleich wieder stoppen
                 }
                 if (((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') || mLastStatus === 'unknown') && mStartMowingTime > 0) {  //  === 0 --> processed in other action like OK_SEARCHING or adapter restarted
                     // mowing
-                    let newMowingTIme = ((new Date().getTime() - mStartMowingTime) / (1000 * 60));
+                    let newMowingTime = ((new Date().getTime() - mStartMowingTime) / (1000 * 60));
 
-                    mMowingTime += newMowingTIme;
-                    mMowingTimeDaily += newMowingTIme;
+                    mMowingTime += newMowingTime;
+                    mMowingTimeDaily += newMowingTime;
                     mStartMowingTime = new Date().getTime();
 
                     adapter.setState(idnMowingTime, Math.round(mMowingTime), true);
                     adapter.setState(idnMowingTimeDaily, Math.round(mMowingTimeDaily), true);
 
-                    adapter.log.debug(fctName + ', mower in action; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime + '; mMowingTimeDaily: ' + mMowingTimeDaily + '; newMowingTIme: ' + newMowingTIme);
+                    adapter.log.debug(fctName + ', mower in action; mLastStatus: ' + mLastStatus + '; mStartMowingTime: ' + mStartMowingTime + '; mMowingTime: ' + mMowingTime + '; mMowingTimeDaily: ' + mMowingTimeDaily + '; newMowingTIme: ' + newMowingTime);
                 }
             }
             if ((mLastStatus === 'OK_CUTTING' || mLastStatus === 'OK_CUTTING_NOT_AUTO') && (mCurrentStatus !== 'OK_CUTTING' && mCurrentStatus !== 'OK_CUTTING_NOT_AUTO') && mStartMowingTime > 0) {
@@ -1550,9 +1658,12 @@ function updateStatus() {
             // time too find station
             if ((mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'XXXXXXX') && mSearchingStartTime > 0) {
                 let searchTime = parseInt((new Date().getTime() - mSearchingStartTime) / (1000 * 60));
+
                 adapter.setState(idnLastStationReturnTime, searchTime, true);
+
                 adapter.log.debug(fctName + ', search finshed; mSearchingStartTime: ' + mSearchingStartTime + '; searchTime: ' + searchTime);
 
+                mStartMowingTime = 0;
                 mSearchingStartTime = 0;
             }
 
@@ -1603,6 +1714,8 @@ function updateStatus() {
                 if (mChargingTimeBatteryNew === 0) {
                     adapter.setState(idnChargingTimeBatteryNew, mChargingTimeBatteryCurrent, true);
                 }
+
+                mStartMowingTime = 0;
                 mChargingStartTime = 0;
                 mChargingTimeBatteryCurrent = 0;
                 // !P! ??? adapter.setState(idnChargingStartTime, mChargingStartTime, true);
@@ -1610,7 +1723,7 @@ function updateStatus() {
         }
         adapter.log.debug(fctName + ', mBatteryPercent: ' + mBatteryPercent + '; mScheduleStatus: ' + mScheduleStatus + '; mScheduleTime: ' + mScheduleTime);
         if (mCurrentStatus === 'OK_CHARGING' || mCurrentStatus === 'PARKED_AUTOTIMER' || mCurrentStatus === 'PARKED_PARKED_SELECTED' || mCurrentStatus === 'PARKED_TIMER' ||
-                mnWebRequestCountDay_error == 4) {
+                mnWebRequestCountDay_error_Check >= 4) {
             // charging --> inactive poll timer
             if (mScheduleStatus === null || (mScheduleStatus !== null && mScheduleTime !== mQueryIntervalInactive_s)) {
                 mScheduleTime = mQueryIntervalInactive_s;
@@ -1645,7 +1758,7 @@ function updateStatus() {
                                                     setState(idNextStartWatching, true);
 
                                                     sMsg = 'mower ' + mobjMower.mower.name + ' state changed, next autostart on "' + formatDate(nextStart, "JJJJ.MM.TT SS:mm:ss") + '"';
-                                                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower ' + mobjMower.mower.name + ' error state changed', nextStart - new Date().getTime() + 60000, 1, 'Tg,EL']), true);
+                                                    adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'subscribe mower ' + mobjMower.mower.name + ' error state changed', nextStart - new Date().getTime() + 60000, MSG_PRIO.info]), true);
                                                 }
                                             }
         */
@@ -1660,7 +1773,7 @@ function updateStatus() {
                 stopMower();
 
                 sMsg = 'mower ' + mobjMower.mower.name + ' stop send while rain state is true';
-                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' stop send', '', 1, 'Tg,EL']), true);
+                adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'mower ' + mobjMower.mower.name + ' stop send', '', MSG_PRIO.info]), true);
             }
         }
         */
@@ -1699,7 +1812,7 @@ function syncConfig(callback) {
         }
 
         // gather states that need to be read
-        adapter.log.debug(fctName + ' idStates: ' + JSON.stringify(idStates));
+        adapter.log.debug(fctName + ' idStates: ' + JSON.stringify(idStates));      // complete list of state objects
 
         for (let idState in idStates) {
             if (!idStates.hasOwnProperty(idState) || idStates[idState] === null) {
@@ -1708,7 +1821,7 @@ function syncConfig(callback) {
             }
 
             let iddp = idState.substr(adapter.namespace.length + 1);
-            adapter.log.debug(fctName + ', processing state:' + iddp);
+            adapter.log.debug(fctName + ', processing state: "' + iddp + '" with value "' + idStates[idState].val + '"');
 
             switch (iddp) {
                 case idnLastStatus:
@@ -1720,8 +1833,8 @@ function syncConfig(callback) {
                 case idnNextStartTime:
                     mNextStart = idStates[idState].val;
                     break;
-                case idnStoppedDueRain:
-                    mStoppedDueRain = idStates[idState].val;
+                case idnStoppedDueToRain:
+                    mStoppedDueToRain = idStates[idState].val;
                     break;
                 case idnCurrentErrorCode:
                     mLastErrorCode = idStates[idState].val;
@@ -1790,17 +1903,28 @@ function syncConfig(callback) {
                     break;
                 case idnWebRequestCountDay:
                     mnWebRequestCountDay = parseInt(idStates[idState].val);
+                    adapter.log.debug(fctName + ', processing state: "' + iddp + '" with value "' + idStates[idState].val + '", set in mnWebRequestCountDay');
                     break;
-                case mnWebRequestCountDay_success:
+                case idnWebRequestCountDay_success:
                     mnWebRequestCountDay_success = parseInt(idStates[idState].val);
                     break;
-            }
+                case idnWebRequestCountDay_error:
+                    mnWebRequestCountDay_error = parseInt(idStates[idState].val);
+                    break;
+                }
         }
+        
         // if battery loaded, then reset stat charging
         if(mBatteryPercent == 100) {
             mChargingStartTime = 0;
         }
-        adapter.log.debug(fctName + ', idnLastStatus: ' + mLastStatus + ', idnNextStartTime: ' + mNextStart + ', idnStoppedDueRain: ' + mStoppedDueRain + ', idnCurrentErrorCode: ' + mLastErrorCode + ', idnCurrentErrorCodeTS: ' + mLastErrorCodeTimestamp);
+
+        // if mower not working, reset mStartMowingTime
+        if (mLastStatus !== 'OK_CUTTING' && mLastStatus !== 'OK_CUTTING_NOT_AUTO' && mLastStatus !== 'OK_LEAVING' && mLastStatus !== 'OK_SEARCHING') {
+            mStartMowingTime = 0;
+        }
+
+        adapter.log.debug(fctName + ', idnLastStatus: ' + mLastStatus + ', idnNextStartTime: ' + mNextStart + ', mStartMowingTime: ' + mStartMowingTime + ', idnStoppedDueRain: ' + mStoppedDueToRain + ', idnCurrentErrorCode: ' + mLastErrorCode + ', idnCurrentErrorCodeTS: ' + mLastErrorCodeTimestamp);
         adapter.log.debug(fctName + ', idnCurrentCoveredDistance: ' + mDist + ', idnLastLocationLongitude: ' + mLastLocationLongi + ', idnLastLocationLatitude: ' + mLastLocationLati + ', idnHomeLocationLongitude: ' + mHomeLocationLongitude + ', idnHomeLocationLatitude: ' + mHomeLocationLongitude);
         adapter.log.debug(fctName + ', idnBatteryPercent: ' + mBatteryPercent + ', idnBatteryChargeCycleDaily: ' + mBatteryChargeCycleDaily + ', idnMowingTime: ' + mMowingTime + ', idnMowingTimeDaily: ' + mMowingTimeDaily);
         //adapter.log.debug(fctName + ', idnLastLocations: ' + JSON.stringify(mJsonLastLocations));
@@ -1889,9 +2013,12 @@ husqApi.on('mowersListUpdated', (mowers) => {
 
 
 function createSubscriber() {
+    const fctName = 'createSubscriber';
+    adapter.log.debug(fctName + ' started');
 
-    adapter.log.debug('createSubscriber, idRainSensor: ' + adapter.config.idRainSensor);
-    if(adapter.config.idRainSensor !== '') {        // use only rain sensor
+    if(adapter.config.idRainSensor !== '' && adapter.config.stopOnRainEnabled == true) {
+        adapter.log.debug(fctName + ', idRainSensor: ' + adapter.config.idRainSensor);            // mqtt.0.hm-rpc.0.OEQ0996420.1.STATE
+
         // get current state
         adapter.getForeignState(adapter.config.idRainSensor, function (err, idState) {
             if (err) {
@@ -1900,52 +2027,74 @@ function createSubscriber() {
                 return;
             }
             if (!idState) {
-                adapter.log.error('createSubscriber, idRainSensor: ' + adapter.config.idRainSensor + ';  object for "getForeignState(adapter.config.idRainSensor, ...)" is: ' + JSON.stringify(idState));
+                adapter.log.error(fctName + ', getForeignState; idRainSensor: ' + adapter.config.idRainSensor + ';  object for "getForeignState(adapter.config.idRainSensor, ...)" is: ' + JSON.stringify(idState));
 
                 return;
             }
-            adapter.log.debug('createSubscriber, idRainSensor: ' + adapter.config.idRainSensor + '; idState: ' + JSON.stringify(idState)); 
+            adapter.log.debug(fctName + ', getForeignState; idRainSensor: ' + adapter.config.idRainSensor + '; idState: ' + JSON.stringify(idState)); 
             // idState: {"val":0,"ack":true,"ts":1596924551829,"q":0,"from":"system.adapter.mqtt.0","user":"system.user.admin","lc":1596220067889}
 
 
-            let bRain = parseBool(idState.val),
-                sMsg = '',
-                vTest = adapter.config.rainSensorValue;
+            adapter.getForeignObject(adapter.config.idRainSensor, function (err, oidState) {
+                if (err) {
+                    adapter.log.error(err);
+    
+                    return;
+                }
 
-            if(vTest && vTest !== '' && typeof vTest === 'object') {
-                switch (vTest[0]) {
-                    case 'bool':
-                        bRain = (parseBool(idState.val) === vTest[1]);
+                const idStateType = oidState.common.type;
+
+                
+                let bRain = false;
+
+                adapter.log.debug(fctName + ', getForeignState; adapter.config.rainSensorValue: "' + adapter.config.rainSensorValue + '"; idStateType: ' + idStateType); 
+
+                switch (idStateType) {
+                    case 'boolean':
+                        bRain = (parseBool(idState.val) === parseBool(adapter.config.rainSensorValue));
                         break;
                     case 'number':
-                        bRain = (parseInt(idState.val) === vTest[1]);
+                        if (adapter.config.rainSensorValue == '0' || adapter.config.rainSensorValue == '1') {
+                            // compare equal
+                            bRain = (parseInt(idState.val) === parseInt(adapter.config.rainSensorValue));
+                        } else {
+                            // compare >=
+                            bRain = (parseFloat(idState.val) >= parseFloat(adapter.config.rainSensorValue.replace(',', '.')));
+                        }
                         break;
                     default:
-                        bRain = (idState.val === vTest[1]);
+                        bRain = (idState.val === adapter.config.rainSensorValue);
                         break;
                 }
-            }
 
-            adapter.log.debug('createSubscriber, idRainSensor: ' + adapter.config.idRainSensor + ';  idState: "' + idState + '"; idState.val: ' + idState.val + '"; vTest[0]: ' + vTest[0] + '"; idState.val === vTest[1]: ' + idState.val === vTest[1]);
 
-            if(bRain) {
-                adapter.setState(idnStoppedDueRain, true, true);
-                adapter.log.debug('createSubscriber, idRainSensor (no rain)');
-            } else {
-                adapter.setState(idnStoppedDueRain, false, true);
-                adapter.log.debug('createSubscriber, idRainSensor (it`s raining)');
-            }
+                if(bRain) {
+                    adapter.setState(idnStoppedDueToRain, true, true);
+                    adapter.log.debug(fctName + ', getForeignState; idRainSensor (it`s raining)');
+                } else {
+                    adapter.setState(idnStoppedDueToRain, false, true);
+                    adapter.log.debug(fctName + ', getForeignState; idRainSensor (no rain)');
+                }
 
-            // id rain sensor is valid
-            adapter.subscribeForeignStates(adapter.config.idRainSensor);
-
-            adapter.log.debug('createSubscriber, subsciption for idRainSensor "' + adapter.config.idRainSensor + '" created');
+                // id rain sensor is valid
+                adapter.subscribeForeignStates(adapter.config.idRainSensor, function (error) {
+                
+                    if (error) {
+                        adapter.log.error(fctName + ', error on create subsciption for idRainSensor "' + adapter.config.idRainSensor + '" (' + JSON.stringify(error) + ')');
+                    } else {
+                        adapter.log.debug(fctName + ', subsciption for idRainSensor "' + adapter.config.idRainSensor + '" created');
+                    }
+                });
+                adapter.log.debug(fctName + ', subsciption for idRainSensor "' + adapter.config.idRainSensor + '" finished');
+            });
         });
+    } else {
+        adapter.log.info(fctName + ', idRainSensor; stop due rain not enabled.');
     }
 
     if(adapter.config.extendedStatistic) {
         // daily accumulation
-        adapter.log.debug('scheduler for dailyAccumulation created');
+        adapter.log.debug(fctName + ', scheduler for dailyAccumulation created');
 
         //!P!scheduleDailyAccumulation = schedule("0 0 * * *", function () {
         mScheduleDailyAccumulation = husqSchedule.scheduleJob({hour: 0, minute: 0}, function () {
@@ -1954,6 +2103,8 @@ function createSubscriber() {
     }
 
     if (adapter.setState) adapter.setState('info.connection', true, true);
+
+    adapter.log.debug(fctName + ' finished');
 
 } // createSubscriber()
 
@@ -2006,7 +2157,7 @@ function main() {
 
         mWaitAfterRain_min = adapter.config.waitAfterRain;
         adapter.log.debug('waitAfterRain: ' + adapter.config.waitAfterRain);
-        if (isNaN(mWaitAfterRain_min) || mWaitAfterRain_min < 60) {
+        if (isNaN(mWaitAfterRain_min)) {            //  || mWaitAfterRain_min < 60
             mWaitAfterRain_min = 60;
         }
         adapter.setState(idnWaitAfterRain, mWaitAfterRain_min, true);
