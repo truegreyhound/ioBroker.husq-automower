@@ -26,19 +26,34 @@
       "de": "Steuere deinen Husqvarna Automower"
     },
     "materialize": true,
+    "license": "MIT",
     "platform": "Javascript/Node.js",
+    "main": "main.js",
     "mode": "daemon",
     "icon": "husq-automower.png",
     "enabled": true,
     "extIcon": "https://raw.githubusercontent.com/truegreyhound/iobroker.husq-automower/master/admin/husq-automower.png",
     "keywords": [
+      "ioBroker",
       "husqvarna",
       "husq-automower",
       "mower"
     ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/truegreyhound/ioBroker.husq-automower"
+    },
+    "homepage": "https://github.com/truegreyhound/ioBroker.husq-automower",
     "readme": "https://github.com/truegreyhound/iobroker.husq-automower/blob/master/README.md",
     "loglevel": "info",
     "type": "garden",
+    "compact": false,
+    "connectionType": "cloud",
+    "dataSource": "poll",
+    "author": {
+      "name": "truegreyhound",
+      "email": "truegreyhound@gmx.net"
+    },
     "authors": [
       {
         "name": "truegreyhound",
@@ -63,5 +78,13 @@
     "waitAfterRain": ""
   },
     "objects": [],
-    "instanceObjects": []
+    "instanceObjects": [
+      {
+          "_id": "info",
+          "type": "channel",
+          "common": {
+              "name": "Information"
+          },
+          "native": {}
+      }
 }

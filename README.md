@@ -92,7 +92,7 @@ At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 ## License
 The MIT License (MIT)
 
-Copyright (c) 2018 truegreyhound <truegreyhound@gmx.net>
+Copyright (c) 2020 truegreyhound <truegreyhound@gmx.net>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
