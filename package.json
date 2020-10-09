@@ -1,11 +1,11 @@
 {
   "name": "iobroker.husq-automower",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Control your Husqvarna Automower with connectmodul",
   "main": "main.js",
   "directories": {},
   "dependencies": {
-	"node-schedule": "^1.2.5",
+    "node-schedule": "^1.2.5",
     "request": "^2.83.0"
   },
   "devDependencies": {
@@ -13,8 +13,7 @@
     "mocha": "^4.1.0",
     "chai": "^4.1.2"
   },
-  "scripts": {
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+https://github.com/truegreyhound/ioBroker.husq-automower.git"
@@ -47,9 +46,5 @@
   "bugs": {
     "url": "https://github.com/truegreyhound/ioBroker.husq-automower/issues"
   },
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/truegreyhound/ioBroker.husq-automower/issues"
-  },
-  "homepage": "https://github.com/truegreyhound/ioBroker.husq-automower#readme"
+  "license": "MIT"
 }

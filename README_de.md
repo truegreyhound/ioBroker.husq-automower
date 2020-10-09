@@ -24,16 +24,38 @@ Via dem Aktions-State "husq-automower.x.mower.action" können folgende Aktionen 
 = 91 - stopp Statusscheduler (mower.scheduleTime == 0)
 = 92 - start Statusscheduler
 
+Das Unterdrücken des Starts des Mowers bei Regen ist ohne Kenntnis der aktuellen Startzeit nicht sinnvoll umsetzbar. Irgendwie blödsinn
+Mäher steht, wartet auf Erreichen Startzeit, Wenn vorher Regen == TRUE, dann prüfen, ob 
+       nächster Start - Wartezeit =< akt. Zeit --> stop
+       nächster Start - Wartezeit > akt. Zeit --> TimerT1, der nächster Start - Wartezeit endet, wenn dann immer noch Regen --> stop
+wenn Regensensor auf TROCKEN, 
+       dann TimerT1 beenden
+       prüfen ob nächster Start - Wartezeit =< akt. Zeit --> Mäher stoppen (falls noch nicht erfolgt) und timer setzen TimerT2, der Mäher dann startet
+       wenn Mäher startet und TimerT2 <> null, TimerT2 zurücksetzen
+
+
 ## Installation
 Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von diesem Adapter nicht mehr unterstützt.
 
 ## Einstellungen
 - Bei E-mail und Passwort müssen die Daten eingeben werden, mit denen man bei Husqvarna registriert und der Mower verbunden ist.
-- max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mover.sendMessage
-
+- max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mower.sendMessage
 
 ## Changelog
 
+#### 1.1.0
+* (Greyhound) mower.lastStartTime nach statistics verschoben: mower.statistics.mowingStartTime, alter Wert wird übernommen und lastStartTime gelöscht, ggf. in View(s) anpassen
+* (Greyhound) subscription auf Regensensor (subscribeForeignStates) scheint nicht überall zu funktionieren, deshalb wird der Status auch im updateStatus direkt ausgelesen und auf Änderung geprüft
+* (Greyhound) Regenwertvergleich geändert, in Konfiguration jetzt den Wert direkt eingeben, bei number: bei 0 oder 1 ==, sonst >=, Typ des Wertes wird aus DP des Sensors gelesen
+* (Greyhound) Konfigurationswert für Wartezeit nach Regen wird wie folgt interpretiert: >= 0 - started mower nach angegebener Zeit, < 0 oder kein Wert - kein automatischer Start
+* (Greyhound) Zähler für Anzahl WebRequests, erfolgreich, Fehler je Tag und kumulativ Monat (WebRequestCountXXXXX), nach 4 Fehlern wird Warnung ins Log geschrieben und das Abfrageinverval ggf. auf Inactive gesetzt, nach mehr als 10 Fehlern wird der Adapterstatus auf Fehler gesetzt.
+* (Greyhound) Der Text zum aktuellen und letzten Fehlercode wird in currentErrorMsg und lastErrorMsg gespeichert (deutsch)
+* (Greyhound) sendMessage, das letzte Feld des Empfängers ist entfallen, wird bei mir jetzt in Abhängigkeit von der Prio gesteuert
+* (Greyhound) Fehler beim Erkennen der Startzeit des Mähens behoben (StartMowingTime)
+* (Greyhound) verschiedene Änderungen um den Code robuster zu machen
+#### 0.3.12
+* (Greyhound) verbessertes Fehlerhandling bei updateStatus, GPS-Daten
+* (Greyhound) Erkennung beim Start, ob Batterie geladen und Rücksetzen der Ladestartzeit
 #### 0.3.10
 * (Greyhound) Status des Regensensors wird beim Adapterstart eingelesen
 * (Greyhound) fix geänderte Statuserkennung (CHARGING wird seit 12.06.2018 nicht mehr gesetzt)

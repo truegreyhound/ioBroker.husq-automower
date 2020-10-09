@@ -28,14 +28,27 @@ Over the action state "husq-automower.x.mower.action" you can do following actio
 
 
 ## installation
-At least Node 4.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
+At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supported by this adapter.
 
 ## settings
 - to connect to the mower, type in email and password from your Husqvarna account in the config.
-- max. distance from base, if exceeded (value > 0), adapter write message to mover.sendMessage
+- max. distance from base, if exceeded (value > 0), adapter write message to mower.sendMessage
 
 ## Changelog
 
+#### 1.1.0
+* (Greyhound) mower.lastStartTime moved to statistics: mower.statistics.mowingStartTime, old value is adopted and lastStartTime is deleted, if necessary adjust in view (s)
+* (Greyhound) Subscription to rain sensor (subscribeForeignStates) does not seem to work everywhere, so the status is also read out directly in updateStatus and checked for changes
+* (Greyhound) Rain value comparison changed, enter the value directly in the configuration, with number: with 0 or 1 ==, otherwise> =, the type of the value is read from the DP of the sensor
+* (Greyhound) Configuration value for waiting time after rain is interpreted as follows:> = 0 - started mower after the specified time, <0 or no value - no automatic start
+* (Greyhound) Counter for the number of WebRequests, successful, errors per day and cumulative month (WebRequestCountXXXXX), after 4 errors a warning is written in the log and the query interval is possibly set to Inactive, after more than 10 errors the adapter status is set to errors.
+* (Greyhound) The text for the current and last error code is saved in currentErrorMsg and lastErrorMsg (in language generated from API)
+* (Greyhound) sendMessage, the last field of the recipient has been omitted, is now controlled for me depending on the priority
+* (Greyhound) Fixed bug when recognizing the start time of mowing (StartMowingTime)
+* (Greyhound) various changes to make the code more robust
+#### 0.3.12
+* (Greyhound) improved error handling with updateStatus, GPS data
+* (Greyhound) Detection when starting whether the battery is charged and resetting the ChargingStartTime
 #### 0.3.10
 * (Greyhound) load rain sensor state on start
 * (Greyhound) fix status detecion (no CHARGING state with beginning 12.06.2018 ?)
