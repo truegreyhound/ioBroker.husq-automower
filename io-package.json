@@ -77,14 +77,15 @@
     "stopOnRainEnabled": "",
     "waitAfterRain": ""
   },
-    "objects": [],
-    "instanceObjects": [
-      {
-          "_id": "info",
-          "type": "channel",
-          "common": {
-              "name": "Information"
-          },
-          "native": {}
-      }
+  "objects": [],
+  "instanceObjects": [
+    {
+        "_id": "info",
+        "type": "channel",
+        "common": {
+            "name": "Information"
+        },
+        "native": {}
+    }
+  ]
 }
