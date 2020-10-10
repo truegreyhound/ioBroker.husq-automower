@@ -5,6 +5,7 @@
   "main": "main.js",
   "directories": {},
   "dependencies": {
+    "diff": "^3.5.0",
     "lodash": "^4.17.20",
     "node-schedule": "^1.2.5",
     "request": "^2.83.0"
