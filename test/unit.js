@@ -1,5 +1,9 @@
-const path = require('path');
-const { tests } = require('@iobroker/testing');
+// @ts-check
 
+const path = require("path");
+const { tests } = require("@iobroker/testing");
+const adapterDir = path.join(__dirname, "..");
+
+// Run tests
 // Run unit tests - See https://github.com/ioBroker/testing for a detailed explanation and further options
-tests.unit(path.join(__dirname, '..'));
+tests.unit(adapterDir, {});
