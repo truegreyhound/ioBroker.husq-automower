@@ -15,7 +15,9 @@
     "gulp": "^4.0.2",
     "mocha": "^8.1.3"
   },
-  "scripts": {},
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/truegreyhound/ioBroker.husq-automower.git"
