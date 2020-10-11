@@ -456,75 +456,83 @@ function createState(name, value, desc, _write, _unit) {
 } // createState(9
 
 
-function createChannels() {
+function createChannels(adapter) {
+    return new Promise((resolve, reject) => {
+        const fctName = 'createChannels';
+        adapter.log.debug(fctName + ' started');
 
-    const fctName = 'createChannels';
-    adapter.log.debug(fctName + ' started');
+        adapter.setObjectNotExists('info', {
+            type: 'channel',
+            role: 'info',
+            common: {
+                name: 'information',
+            },
+            native: {}
+        }, function(err) {
+            if (err) adapter.log.error('Cannot write object: ' + err);
 
-    adapter.setObjectNotExists('info', {
-        type: 'channel',
-        role: 'info',
-        common: {
-            name: 'information',
-        },
-        native: {}
-    }, function(err) {
-        if (err) adapter.log.error('Cannot write object: ' + err);
+            reject(err);
+        });
+
+        adapter.setObjectNotExists('mower', {
+            type: 'channel',
+            role: 'info',
+            common: {
+                name: 'mower',
+            },
+            native: {}
+        }, function(err) {
+            if (err) adapter.log.error('Cannot write object: ' + err);
+        });
+
+        adapter.setObjectNotExists('mower.homeLocation', {
+            type: 'channel',
+            role: 'info',
+            common: {
+                name: 'mower.homeLocation',
+            },
+            native: {}
+        }, function(err) {
+            if (err) adapter.log.error('Cannot write object: ' + err);
+        });
+
+        adapter.setObjectNotExists('mower.lastLocation', {
+            type: 'channel',
+            role: 'info',
+            common: {
+                name: 'mower.lastLocation',
+            },
+            native: {}
+        }, function(err) {
+            if (err) adapter.log.error('Cannot write object: ' + err);
+        });
+
+        adapter.setObjectNotExists('mower.statistics', {
+            type: 'channel',
+            role: 'info',
+            common: {
+                name: 'mower.statistics',
+            },
+            native: {}
+        }, function(err) {
+            if (err) adapter.log.error('Cannot write object: ' + err);
+        });
+
+        adapter.log.debug(fctName + ' finished');
+
+        const successObject = {
+            msg: 'Success',
+            data: true,
+        };
+        resolve(successObject); 
     });
-
-    adapter.setObjectNotExists('mower', {
-        type: 'channel',
-        role: 'info',
-        common: {
-            name: 'mower',
-        },
-        native: {}
-    }, function(err) {
-        if (err) adapter.log.error('Cannot write object: ' + err);
-    });
-
-    adapter.setObjectNotExists('mower.homeLocation', {
-        type: 'channel',
-        role: 'info',
-        common: {
-            name: 'mower.homeLocation',
-        },
-        native: {}
-    }, function(err) {
-        if (err) adapter.log.error('Cannot write object: ' + err);
-    });
-
-    adapter.setObjectNotExists('mower.lastLocation', {
-        type: 'channel',
-        role: 'info',
-        common: {
-            name: 'mower.lastLocation',
-        },
-        native: {}
-    }, function(err) {
-        if (err) adapter.log.error('Cannot write object: ' + err);
-    });
-
-    adapter.setObjectNotExists('mower.statistics', {
-        type: 'channel',
-        role: 'info',
-        common: {
-            name: 'mower.statistics',
-        },
-        native: {}
-    }, function(err) {
-        if (err) adapter.log.error('Cannot write object: ' + err);
-    });
-
-    adapter.log.debug(fctName + ' finished');
 
 } // createChannels()
 
 
-function createDPs() {
-
-    const fctName = 'createDPs',
-        saveRawData = adapter.config.saveRawData;
+function createDPs(adapter) {
+    const fctName = 'createDPs';
+    const saveRawData = adapter.config.saveRawData;
 
     adapter.log.debug(fctName + ' started');
 
@@ -644,10 +652,17 @@ function createDPs() {
 
 
 function createDataStructure(adapter) {
+    const fctName = 'createDataStructure';
+    adapter.log.debug(fctName + ' started');
 
-    createChannels();
+    createChannels(adapter)
+    .then(result => {
+        adapter.log.debug(fctName + ', createChannels() finished; result: ' + JSON.stringify(result));
 
-    createDPs();
+        createDPs(adapter);
+    });
+
+    adapter.log.debug(fctName + ' finished');
 
 } // createDataStructure()
 
@@ -2455,7 +2470,7 @@ function main() {
         adapter.setState('info.connected', false, true);
     }
     else {
-        createDataStructure();
+        createDataStructure(adapter);
 
         adapter.log.debug('Mail address: ' + adapter.config.email);
         //adapter.log.debug('Password were set to: ' + adapter.config.pwd);
