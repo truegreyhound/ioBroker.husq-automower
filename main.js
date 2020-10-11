@@ -660,6 +660,9 @@ function createDataStructure(adapter) {
         adapter.log.debug(fctName + ', createChannels() finished; result: ' + JSON.stringify(result));
 
         createDPs(adapter);
+    })
+    .catch(err => {
+        adapter.log.error(fctName + ', createChannels() finished; result: ' + JSON.stringify(err));
     });
 
     adapter.log.debug(fctName + ' finished');
