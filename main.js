@@ -2545,7 +2545,10 @@ function main() {
 
         setTimeout(mower_login, 2000);
 
-        setTimeout(createSubscriberAsync, 3000);
+        setTimeout(() => {
+            createSubscriberAsync()
+            .catch(err => adapter.log.error(err));
+        }, 3000);
 
         setTimeout(() => {
             // subscribe own events
