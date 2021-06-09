@@ -13,7 +13,25 @@
     "mocha": "^4.1.0",
     "chai": "^4.1.2"
   },
-  "scripts": {},
+  "gitHead": "6261c29f6be21a34f41fd22375bb8504362ded63",
+  "_id": "iobroker.husq-automower@2.1.1",
+  "_shasum": "2376373425e266d6b8327f4923e3d8276918557a",
+  "_from": "iobroker.husq-automower@latest",
+  "_npmVersion": "3.10.10",
+  "_nodeVersion": "6.11.4",
+  "_npmUser": {
+    "name": "truegreyhound",
+    "email": "truegreyhound@gmx.net"
+  },
+  "dist": {
+    "shasum": "2376373425e266d6b8327f4923e3d8276918557a",
+    "tarball": "https://registry.npmjs.org/iobroker.husq-automower/-/iobroker.husq-automower-1.0.0.tgz",
+    "fileCount": 27,
+    "unpackedSize": 175373
+  },
+  "scripts": {
+    "test": "node node_modules/mocha/bin/mocha --exit"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/truegreyhound/ioBroker.husq-automower.git"
@@ -46,5 +64,10 @@
   "bugs": {
     "url": "https://github.com/truegreyhound/ioBroker.husq-automower/issues"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "_npmOperationalInternal": {
+    "host": "s3://npm-registry-packages",
+    "tmp": "tmp/iobroker.husq-automower_2.1.1_1523598295733_0.8275777524600805"
+  },
+  "_resolved": "https://registry.npmjs.org/iobroker.husq-automower/-/iobroker.husq-automower-1.0.0.tgz"
 }

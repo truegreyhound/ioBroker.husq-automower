@@ -453,7 +453,7 @@ function createState(name, value, desc, _write, _unit) {
             }
         });
     }
-} // createState(9
+} // createState()
 
 
 function createChannels() {
