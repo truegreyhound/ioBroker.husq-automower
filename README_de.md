@@ -42,7 +42,8 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 - max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mower.sendMessage
 
 ## Changelog
-
+#### 1.1.1
+* (Greyhound) einige Verbesserungen im Adapter-handling
 #### 1.1.0
 * (Greyhound) mower.lastStartTime nach statistics verschoben: mower.statistics.mowingStartTime, alter Wert wird übernommen und lastStartTime gelöscht, ggf. in View(s) anpassen
 * (Greyhound) subscription auf Regensensor (subscribeForeignStates) scheint nicht überall zu funktionieren, deshalb wird der Status auch im updateStatus direkt ausgelesen und auf Änderung geprüft

@@ -3,7 +3,7 @@
     "name": "husq-automower",
     "version": "1.1.0",
     "news": {
-      "1.1.0": {
+      "1.1.1": {
         "en": "stable fixes",
         "de": "stable fixes"
       },
@@ -18,7 +18,7 @@
     },
     "title": "Husqvarna Automower with Connectmodul",
     "titleLang": {
-      "en": "Control your Husqvarna Automower over www",
+      "en": "Control your Husqvarna Automower over the web",
       "de": "Steuern Sie Ihren Husqvarna Automower über das Web"
     },
     "desc": {
@@ -26,25 +26,41 @@
       "de": "Steuere deinen Husqvarna Automower"
     },
     "materialize": true,
+    "license": "MIT",
     "platform": "Javascript/Node.js",
+    "main": "main.js",
     "mode": "daemon",
     "icon": "husq-automower.png",
     "enabled": true,
     "extIcon": "https://raw.githubusercontent.com/truegreyhound/iobroker.husq-automower/master/admin/husq-automower.png",
     "keywords": [
+      "ioBroker",
       "husqvarna",
       "husq-automower",
       "mower"
     ],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/truegreyhound/ioBroker.husq-automower"
+    },
+    "homepage": "https://github.com/truegreyhound/ioBroker.husq-automower",
     "readme": "https://github.com/truegreyhound/iobroker.husq-automower/blob/master/README.md",
     "loglevel": "info",
     "type": "garden",
+    "compact": false,
+    "connectionType": "cloud",
+    "dataSource": "poll",
+    "author": {
+      "name": "truegreyhound",
+      "email": "truegreyhound@gmx.net"
+    },
     "authors": [
       {
         "name": "truegreyhound",
         "email": "truegreyhound@gmx.net"
       }
-    ]
+    ],
+    "installedFrom": "https://github.com/truegreyhound/ioBroker.husq-automower/tarball/2c07e136ae715bffdde7fc1ceca07a797579735b"
   },
   "native": {
     "email": "",
@@ -62,6 +78,15 @@
     "stopOnRainEnabled": "",
     "waitAfterRain": ""
   },
-    "objects": [],
-    "instanceObjects": []
+  "objects": [],
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": "Information"
+      },
+      "native": {}
+    }
+  ]
 }

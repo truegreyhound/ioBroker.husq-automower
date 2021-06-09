@@ -36,6 +36,8 @@ At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 1.1.1
+* (Greyhound) some improvements in adapter handling
 #### 1.1.0
 * (Greyhound) mower.lastStartTime moved to statistics: mower.statistics.mowingStartTime, old value is adopted and lastStartTime is deleted, if necessary adjust in view (s)
 * (Greyhound) Subscription to rain sensor (subscribeForeignStates) does not seem to work everywhere, so the status is also read out directly in updateStatus and checked for changes
@@ -92,7 +94,7 @@ At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 ## License
 The MIT License (MIT)
 
-Copyright (c) 2018 truegreyhound <truegreyhound@gmx.net>
+Copyright (c) 2021 truegreyhound <truegreyhound@gmx.net>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
