@@ -2,3 +2,6 @@
 .npmignore
 *.bak
 package-lock.json.save
+admin/i18n
+node_modules/
+appveyor.yml.orig
