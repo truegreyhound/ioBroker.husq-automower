@@ -2,7 +2,7 @@
  *
  *      ioBroker Husqvarna Automower Adapter
  *
- *      (c) 2018 Greyhound <truegreyhound@gmx.net>
+ *      (c) 2018-2021 Greyhound <truegreyhound@gmx.net>
  *
  *      MIT License
  *
@@ -13,7 +13,7 @@
 /*jslint node: true */
 "use strict";
 
-//!V! 1.0.4.0
+//!V! 1.1.2.0
 /*
 mower.lastStartTime --> mower.statistics.mowingStartTime, alter Wert wird übernommen und lastStartTime gelöscht, ggf. in View(s) anpassen
 Regenwertvergleich bei number: bei 0 oder 1 ==, sonst >=, Typ des Wertes wird aus DP des Sensors gelesen
@@ -359,6 +359,7 @@ const ERROR_CODES_MT = {
         '45': {'alarm': false, 'language': {'ger': 'Unerwartete Schnitthöhenverstellung/Problem Antrieb Schnitthöhe'}},
         '46': {'alarm': false, 'language': {'ger': 'Begrenzter Schnitthöhenbereich'}},
         '47': {'alarm': false, 'language': {'ger': 'Unerwartete Schnitthöhenverstellung/Problem Antrieb Schnitthöhe'}},
+        '49': {'alarm': false, 'language': {'ger': 'unknown code 49'}},
         '70': {'alarm': false, 'language': {'ger': 'Mäher/Klingen reinigen'}},
         '71': {'alarm': true, 'language': {'ger': 'Mäher angehoben'}}     // 430 oder 450?
     }   
@@ -374,7 +375,8 @@ adapter.on('unload', function (callback) {
         if(mScheduleStatus !== null) clearInterval(mScheduleStatus);    //.cancel;
         if(mScheduleDailyAccumulation !== null) husqSchedule.cancelJob(mScheduleDailyAccumulation);
 
-        if (adapter.setState) adapter.setState('info.connection', false, true);
+        //!P!if (adapter.setState) adapter.setState('info.connection', false, true);
+        if (adapter.setState) adapter.setState(idnMowerConnected, false, true);
 
         adapter.log.info('cleaned everything up...');
 
@@ -1127,7 +1129,7 @@ function checkAMatHome(lat2, long2) {
         a = 0.5 - Math.cos(dLat)/2 + Math.cos(mHomeLocationLatitude * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (1 - Math.cos(dLon)) / 2,
         dist = R * 2 * Math.asin(Math.sqrt(a)) * 1000;
 
-    adapter.setState(idnHomeLocationCurrentDistance, Math.round(dist));
+    adapter.setState(idnHomeLocationCurrentDistance, Math.round(dist), true);
     //let dist = Math.acos(Math.sin(degrees_to_radians(mHomeLocationLatitude)) * Math.sin(degrees_to_radians(lat2)) + Math.cos(degrees_to_radians(mHomeLocationLatitude)) * Math.cos(degrees_to_radians(lat2)) * Math.cos(degrees_to_radians(long2) - degrees_to_radians(mHomeLocationLongitude))) * 6371 * 1000;
 
     if (dist > mMaxDistance && mMaxDistance > 0) {
@@ -1266,7 +1268,7 @@ function dailyAccumulation(bCheck) {
             if(bCheck === false || (stateMTD.ts <= new Date().setHours(0, 0, 0, 0) && stateMTD.val > 0)) {
                 adapter.getState(idnOverallMowingTime, function (errOMT, stateOMT) {
                     if (!errOMT && stateOMT) {
-                        adapter.setState(idnOverallMowingTime, Math.round(stateOMT.val + (stateMTD.val / 60)));       // in h
+                        adapter.setState(idnOverallMowingTime, Math.round(stateOMT.val + (stateMTD.val / 60)), true);       // in h
                         adapter.log.debug(fctName + ', overall mowing time: ' + stateOMT.val + '; daily mowing time: ' + (stateMTD.val / 60) + '; Math.round: ' + Math.round(stateOMT.val + (stateMTD.val / 60)));
 
                         // reset daily mowing time
@@ -1287,7 +1289,7 @@ function dailyAccumulation(bCheck) {
             if(bCheck === false || (stateCCD.ts <= new Date().setHours(0, 0, 0, 0) && stateCCD.val > 0)) {
                 adapter.getState(idnOverallBatteryChargeCycle, function (errOBCC, stateOBCC) {
                     if (!errOBCC && stateOBCC) {
-                        adapter.setState(idnOverallBatteryChargeCycle, (stateCCD.val + stateOBCC.val));
+                        adapter.setState(idnOverallBatteryChargeCycle, (stateCCD.val + stateOBCC.val), true);
                         adapter.log.debug(fctName + ', overall charging cycle: ' + stateOBCC.val + ': daily charging cycle: ' + stateCCD.val);
 
                         // reset daily charging cycle
@@ -1426,7 +1428,8 @@ function updateStatus() {
                 adapter.setState(idnSendMessage, JSON.stringify([new Date().getTime(), sMsg, 'error on getting status for mower ' + mobjMower.mower.name, 'Mower.getStatus', MSG_PRIO.alarm]), true);
             }
 
-            if ((adapter.setState) && mnWebRequestCountDay_error_Check > 10) adapter.setState('info.connection', false, true);
+            //!P!if ((adapter.setState) && mnWebRequestCountDay_error_Check > 10) adapter.setState('info.connection', false, true);
+            if ((adapter.setState) && mnWebRequestCountDay_error_Check > 10) adapter.setState(idnMowerConnected, false, true);
 
             return;
         }
@@ -1493,7 +1496,7 @@ function updateStatus() {
             adapter.setState(idnCurrentErrorMsg, sErrorMsg, true);
             adapter.setState(idnCurrentErrorCodeTS, (result.lastErrorCodeTimestamp > 0) ? (result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60)) : result.lastErrorCodeTimestamp, true);
 
-            if (ERROR_CODES[result.lastErrorCode]['alarm']) {
+            if ((ERROR_CODES[result.lastErrorCode]) && ERROR_CODES[result.lastErrorCode]['alarm']) {
             //!P! if(parseInt(result.lastErrorCode) === 71) {
                 // mower lifted
                 const sMsg = fctName + ' alarm for mower ' + mobjMower.mower.name + ' mower lifted, errorcode 71';
@@ -1502,7 +1505,7 @@ function updateStatus() {
             if (parseInt(result.lastErrorCode) === 0 && mLastErrorCode > 0) {
                 adapter.setState(idnLastErrorCode, mLastErrorCode, true);
 
-                sErrorMsg = '';            // !P!?? oder lieber = <unknown>
+                sErrorMsg = '<unknown>';
                 if (ERROR_CODES[mLastErrorCode]) sErrorMsg = ERROR_CODES[mLastErrorCode].language.ger;
 
                 adapter.setState(idnLastErrorMsg, sErrorMsg, true);
@@ -1516,8 +1519,8 @@ function updateStatus() {
             mLastErrorCodeTimestamp = (result.lastErrorCodeTimestamp > 0) ? result.lastErrorCodeTimestamp + (mTimeZoneOffset * 60) : result.lastErrorCodeTimestamp;
         }
 
-        adapter.setState(idnLastStatus, mCurrentStatus);
-        adapter.setState(idnLastStatusTime, parseInt(result.storedTimestamp));
+        adapter.setState(idnLastStatus, mCurrentStatus, true);
+        adapter.setState(idnLastStatusTime, parseInt(result.storedTimestamp), true);
 
         adapter.setState(idnBatteryPercent, parseInt(result.batteryPercent), true);
         mBatteryPercent = parseInt(result.batteryPercent);
@@ -2251,8 +2254,8 @@ husqApi.on('mowersListUpdated', (mowers) => {
                 }
 
                 // check, if correct instance
-                if(idState.val === '' || (idState.val !== '' && idState.val === mobjMower.mower.name)) {
-                    if(idState.val === '') adapter.setState(idnMowerNickname, mobjMower.mower.name, true);
+                if(!(idState) || idState.val === '' || (idState.val !== '' && idState.val === mobjMower.mower.name)) {
+                    if(!(idState) || idState.val === '') adapter.setState(idnMowerNickname, mobjMower.mower.name, true);
 
                     adapter.setState(idnMowerID, mobjMower.mower.id, true);
                     adapter.setState(idnMowerModel, mobjMower.mower.model, true);
@@ -2354,7 +2357,8 @@ function createSubscriber() {
         });
     }
 
-    if (adapter.setState) adapter.setState('info.connection', true, true);
+    //!P!if (adapter.setState) adapter.setState('info.connection', true, true);
+    if (adapter.setState) adapter.setState(idnMowerConnected, true, true);
 
     adapter.log.debug(fctName + ' finished');
 
@@ -2443,7 +2447,8 @@ function createSubscriberAsync() {
             });
         }
 
-        if (adapter.setState) adapter.setState('info.connection', true, true);
+        //!P!if (adapter.setState) adapter.setState('info.connection', true, true);
+        if (adapter.setState) adapter.setState(idnMowerConnected, true, true);
 
         adapter.log.debug(fctName + ' finished');
 
@@ -2470,7 +2475,7 @@ function main() {
     if (adapter.config.pwd === "PASSWORD") {
 
         adapter.log.error("Bitte die Felder E-Mail und Passwort ausfüllen!");
-        adapter.setState('info.connected', false, true);
+        adapter.setState(idnMowerConnected, false, true);
     }
     else {
         createDataStructure(adapter);

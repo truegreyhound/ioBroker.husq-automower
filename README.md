@@ -36,6 +36,9 @@ At least Node 8.X.X must be installed, Node 0.10 and 0.12 are no longer supporte
 
 ## Changelog
 
+#### 1.1.2
+* (Greyhound) fix some setState with ack=true
+* (Greyhound) fix mower error handling on unknown codes
 #### 1.1.1
 * (Greyhound) some improvements in adapter handling
 #### 1.1.0

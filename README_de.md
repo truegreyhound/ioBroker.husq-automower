@@ -42,6 +42,9 @@ Es muss mindestens Node 4.X.X Installiert sein, Node 0.10 und 0.12 werden von di
 - max. Entfernung von der Basis, wird diese überschritten (> 0), wird eine Alarmmessage generiert --> mower.sendMessage
 
 ## Changelog
+#### 1.1.2
+* (Greyhound) einige fehlende setState mit ack=true gesetzt
+* (Greyhound) error Handling für Mäher bei unbekannten Codes gefixt
 #### 1.1.1
 * (Greyhound) einige Verbesserungen im Adapter-handling
 #### 1.1.0
